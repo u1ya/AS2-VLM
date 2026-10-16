@@ -1,0 +1,177 @@
+{
+  "model": "qwen2.5vl:3b",
+  "executed": false,
+  "cases": [
+    {
+      "instruction": "Дойди до белой стены",
+      "passed": true,
+      "plan": {
+        "schema_version": 1,
+        "task_id": "34b192d1-ebeb-441b-abd3-2c9772d93ede",
+        "steps": [
+          {
+            "skill": "approach_target",
+            "target": {
+              "kind": "wall",
+              "color": "white"
+            }
+          }
+        ]
+      },
+      "seconds": 0.375
+    },
+    {
+      "instruction": "Дойди до двери",
+      "passed": true,
+      "plan": {
+        "schema_version": 1,
+        "task_id": "b8f57c41-8ff3-4834-b39b-b6e44ae961ce",
+        "steps": [
+          {
+            "skill": "approach_target",
+            "target": {
+              "kind": "door"
+            }
+          }
+        ]
+      },
+      "seconds": 0.328
+    },
+    {
+      "instruction": "Оглянись вокруг",
+      "passed": true,
+      "plan": {
+        "schema_version": 1,
+        "task_id": "8b3eeef7-a0f9-4b0f-b6c9-53ff9b792841",
+        "steps": [
+          {
+            "skill": "look_around"
+          }
+        ]
+      },
+      "seconds": 0.235
+    },
+    {
+      "instruction": "Повернись в сторону мужчины",
+      "passed": true,
+      "plan": {
+        "schema_version": 1,
+        "task_id": "4a9106fb-3382-4af7-ac1e-9142129aeb8a",
+        "steps": [
+          {
+            "skill": "face_target",
+            "target": {
+              "kind": "person",
+              "description": "мужчина"
+            }
+          }
+        ]
+      },
+      "seconds": 0.328
+    },
+    {
+      "instruction": "Повернись к двери и подойди к ней",
+      "passed": true,
+      "plan": {
+        "schema_version": 1,
+        "task_id": "635851dd-afd8-45dd-81f9-fbad3b124477",
+        "steps": [
+          {
+            "skill": "face_target",
+            "target": {
+              "kind": "door"
+            }
+          },
+          {
+            "skill": "approach_target",
+            "target": {
+              "kind": "door"
+            }
+          }
+        ]
+      },
+      "seconds": 0.406
+    },
+    {
+      "instruction": "Пройди вперед на метр и остановись",
+      "passed": true,
+      "plan": {
+        "schema_version": 1,
+        "task_id": "dd07921a-3dc2-4c38-b4b4-9ae9605b5ab2",
+        "steps": [
+          {
+            "skill": "walk_distance",
+            "distance_m": 1
+          },
+          {
+            "skill": "stop"
+          }
+        ]
+      },
+      "seconds": 0.297
+    }
+  ],
+  "vision_cases": [
+    {
+      "target": {
+        "kind": "person",
+        "description": "person wearing a plaid shirt"
+      },
+      "expected_status": "found",
+      "passed": true,
+      "observation": {
+        "target": {
+          "kind": "person",
+          "description": "person wearing a plaid shirt"
+        },
+        "status": "found",
+        "coordinate_system": "normalized_1000",
+        "bbox_1000": [
+          504,
+          290,
+          816,
+          596
+        ],
+        "bbox": [
+          0.504,
+          0.29,
+          0.816,
+          0.596
+        ],
+        "image_width": 768,
+        "image_height": 512,
+        "metric_depth_available": false,
+        "source": "vlm_proposal",
+        "tracking_verified": false
+      },
+      "seconds": 2.047
+    },
+    {
+      "target": {
+        "kind": "door"
+      },
+      "expected_status": "not_found",
+      "passed": true,
+      "observation": {
+        "target": {
+          "kind": "door"
+        },
+        "status": "not_found",
+        "coordinate_system": "normalized_1000",
+        "bbox_1000": null,
+        "bbox": null,
+        "image_width": 768,
+        "image_height": 512,
+        "metric_depth_available": false,
+        "source": "vlm_proposal",
+        "tracking_verified": false
+      },
+      "seconds": 0.5
+    }
+  ],
+  "scope": "In-sample instruction smoke tests and vision status/schema checks; not a navigation benchmark",
+  "localization_accuracy_evaluated": false,
+  "model_digest": "79d4979787523c92629bc043c0584a5132d6758e40b429586203a6b1094cb6f8",
+  "passed": 8,
+  "total": 8
+}

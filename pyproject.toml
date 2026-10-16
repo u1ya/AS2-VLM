@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "as2-vlm"
+version = "0.1.0"
+description = "AS2 language control prototype"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+vision = ["Pillow>=10,<13"]
+
+[tool.setuptools.packages.find]
+include = ["as2_vlm*"]

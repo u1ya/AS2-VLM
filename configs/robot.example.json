@@ -1,0 +1,10 @@
+{
+  "backend": "mock",
+  "motion_enabled": false,
+  "sdk_commit": null,
+  "firmware_version": null,
+  "network_interface": null,
+  "rgb_source": null,
+  "depth_source": null,
+  "odometry_source": null
+}
