@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .parser import parse_instruction
 from .simulator import WORLD, simulate
+from .state_bridge import ReadOnlyAS2Bridge, StateReadError
 from .vlm import OllamaBackend, plan_instruction
 
 
@@ -16,6 +17,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(raw)
 
@@ -28,12 +30,30 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(404, {"error": "Not found"})
 
     def do_POST(self):
-        if self.path != "/simulate":
+        if self.path not in {"/simulate", "/robot-state"}:
             self.reply(404, {"error": "Not found"})
             return
         # Reject browser requests originating outside this demo.
         if self.headers.get("Origin") not in (None, "http://" + self.headers.get("Host", "")):
             self.reply(403, {"error": "Origin rejected"})
+            return
+        if self.path == '/robot-state':
+            # Browser clients must opt in from this page; the bridge is startup-configured only.
+            expected = f'http://127.0.0.1:{self.server.server_port}'
+            if (self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}' or
+                    self.headers.get('Origin') not in (None, expected) or
+                    self.headers.get('X-AS2-Read-Only') != '1'):
+                self.reply(403, {'error': 'Read-only request rejected'})
+                return
+            bridge = getattr(self.server, 'robot_bridge', None)
+            if bridge is None:
+                self.reply(503, {'error': 'Robot state backend disabled; start demo with --robot-state',
+                                 'hardware_connected': False, 'motion_enabled': False})
+                return
+            try:
+                self.reply(200, bridge.get_state())
+            except StateReadError as exc:
+                self.reply(503, {'error': str(exc), 'hardware_connected': False, 'motion_enabled': False})
             return
         try:
             size = int(self.headers.get("Content-Length", "0"))
@@ -60,8 +80,12 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument('--robot-state', action='store_true')
+    parser.add_argument('--robot-interface', default='eth1')
+    parser.add_argument('--wsl-distro', default='Ubuntu-22.04')
     args = parser.parse_args()
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server.robot_bridge = ReadOnlyAS2Bridge(args.robot_interface, args.wsl_distro) if args.robot_state else None
     print(f"Simulation: http://127.0.0.1:{args.port}", flush=True)
     server.serve_forever()
 

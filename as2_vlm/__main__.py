@@ -5,6 +5,7 @@ from .bridge import MockBridge
 from .contracts import PlanError
 from .dry_run import preview_plan
 from .parser import parse_instruction
+from .state_bridge import ReadOnlyAS2Bridge, StateReadError
 from .vlm import DEFAULT_MODEL, OllamaBackend, VLMError, ground_target, plan_instruction, read_image
 
 
@@ -16,8 +17,16 @@ def main():
     parser.add_argument("--endpoint", default="http://127.0.0.1:11434")
     parser.add_argument("--image", help="PNG/JPEG frame for local VLM grounding")
     parser.add_argument("--healthcheck", action="store_true")
+    parser.add_argument("--robot-state", action="store_true", help="Read AS2 state only; no motion")
+    parser.add_argument("--robot-interface", default="eth1")
+    parser.add_argument("--wsl-distro", default="Ubuntu-22.04")
     args = parser.parse_args()
     try:
+        if args.robot_state:
+            if args.instruction or args.healthcheck or args.image:
+                parser.error('--robot-state cannot be combined with planning or model healthcheck')
+            print(json.dumps(ReadOnlyAS2Bridge(args.robot_interface, args.wsl_distro).get_state(), ensure_ascii=False, indent=2))
+            return 0
         if args.healthcheck:
             result = OllamaBackend(args.endpoint, args.model, timeout=5).healthcheck()
             print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -40,7 +49,7 @@ def main():
                     observations.append(ground_target(backend, target, encoded_image))
             result["observations"] = observations
             result["visual_targets_resolved"] = all(o["status"] == "found" for o in observations)
-    except (PlanError, VLMError, OSError) as exc:
+    except (PlanError, VLMError, StateReadError, OSError) as exc:
         print(json.dumps({"status": "REJECTED", "reason": str(exc), "executed": False}, ensure_ascii=False))
         return 2
     print(json.dumps(result, ensure_ascii=False, indent=2))

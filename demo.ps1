@@ -1,4 +1,9 @@
-param([int]$Port = 8765)
+param(
+    [int]$Port = 8765,
+    [switch]$RobotState,
+    [string]$RobotInterface = 'eth1',
+    [string]$WslDistro = 'Ubuntu-22.04'
+)
 $ErrorActionPreference = "Stop"
 $pythonExecutable = $env:AS2_VLM_PYTHON
 if (-not $pythonExecutable) {
@@ -12,7 +17,11 @@ if (-not $pythonExecutable) {
 $env:PYTHONUTF8 = "1"
 Push-Location $PSScriptRoot
 try {
-    & $pythonExecutable -m as2_vlm.demo --port $Port
+    $demoArgs = @('-m', 'as2_vlm.demo', '--port', "$Port")
+    if ($RobotState) {
+        $demoArgs += @('--robot-state', '--robot-interface', $RobotInterface, '--wsl-distro', $WslDistro)
+    }
+    & $pythonExecutable @demoArgs
 } finally {
     Pop-Location
 }

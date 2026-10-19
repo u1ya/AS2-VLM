@@ -16,7 +16,7 @@ Inspired by [NaVILA](https://github.com/AnjieCheng/NaVILA), this project starts 
 - **Interactive simulation:** a top-down room, target objects, optional obstacle, trajectory display, stop/reset controls, and adjustable playback speed.
 - **Experimental visual grounding:** bounding-box proposals from PNG/JPEG input, including explicit absent and ambiguous target states.
 - **Development tools:** unit and local HTTP tests, live model smoke checks, environment preflight checks, and model-server scripts.
-- **SDK preparation:** a separate read-only C++ AS2 state probe, not yet built or verified on hardware.
+- **Read-only SDK access:** a C++ AS2 state probe and the official state subscriber have been built and tested against AS2 through WSL2. See [SDK Notes](docs/sdk_notes.md) for the peer-scoped UDP firewall requirements; motion control is not integrated.
 
 ## Architecture
 
@@ -127,7 +127,26 @@ python -m as2_vlm --backend ollama --image room.jpg "Дойди до белой 
 python -m as2_vlm "Оглянись вокруг"
 ```
 
-Successful CLI output is always `PREVIEW_ONLY` with `executed: false`. It never sends motion commands to a robot.
+Successful planning CLI output is always `PREVIEW_ONLY` with `executed: false`. It never sends motion commands to a robot.
+
+### Read AS2 State
+
+With the C++ probe built and the Ethernet/firewall setup complete (see [SDK Notes](docs/sdk_notes.md)):
+
+```bash
+python -m as2_vlm --robot-state --robot-interface eth1
+python -m as2_vlm.demo --robot-state --robot-interface eth1
+```
+
+On Windows, `./run.ps1 --robot-state` and `./demo.ps1 -RobotState` select the configured Python automatically. The Windows bridge launches the probe through WSL Ubuntu-22.04; Linux runs it directly. Use `--wsl-distro` for a different WSL distribution.
+
+The demo's separate AS2 state section reads a timestamped snapshot only when its refresh button is pressed. It shows the actual operating mode, speed level, and process state. It is not a continuous connection indicator or odometry stream. No hardware queries occur without the server's explicit `--robot-state` opt-in. Simulation controls remain unrelated to hardware; the stop button is **not** a physical emergency stop.
+
+A separate, operator-invoked `as2_stop_only` utility is provided for network `StopMove` requests. It is not called by the application, is not an independent emergency stop, and has not been physically verified merely by building it. See [Physical Test Safety](docs/physical_test.md) before use. Unplugging Ethernet is not a verified stop mechanism.
+
+An isolated `as2_forward_pulse` manual bench-test utility is also available. It requires explicit confirmation, checks state and a stop acknowledgement, and requests a small fixed forward-velocity pulse followed by best-effort stopping. One operator-approved test returned successful Move and StopMove acknowledgements; travel distance was not measured and physical behavior requires operator verification. It is **not** a validated locomotion controller or a guaranteed single step and must not be used without an independent operator-controlled stop. Neither tool is exposed through the demo or the language planner.
+
+The separate `as2_walk_meter` test adds an odometry-based one-meter target, a 0.15 m/s speed cap, a 12-second time limit, and best-effort stop conditions for stale data, lack of progress, and motion deviations. Its read-only odometry preflight has passed on AS2. The latest operator-approved physical attempt reached approximately 0.969 m by odometry before stopping on lack of progress, with StopMove acknowledged and stationary telemetry afterward. A full one-meter traversal has not been verified. The vertical-speed guard was increased to 0.5 m/s at the operator's request; this is not a validated safety limit. Other guards remain enabled. This is not obstacle-aware navigation or a hard safety controller. See [Physical Test Safety](docs/physical_test.md) before use and [Resume the Project](docs/RESUME.md) for the saved setup, results, rebuild and restart instructions.
 
 ## Testing and Evaluation
 
@@ -145,7 +164,7 @@ The regression suite covers plan validation, parser behavior, local model transp
 
 ## Safety and Limitations
 
-- **No physical execution:** the demo and CLI do not use the AS2 motion SDK. The separate C++ probe is intended only to read state.
+- **Application motion disabled:** optional app hardware access only calls `SportClient.GetState`. Demo motion and stop controls affect simulation only. Separate manual test binaries can issue StopMove or a forward pulse and require the precautions above; they are not application backends.
 - **No camera-driven navigation:** bounding boxes are unverified proposals. A reviewed output was visibly inaccurate; refined detection, tracking, calibration, and metric depth remain necessary.
 - **No legged dynamics:** the demo models planar kinematics and a circular footprint, not balance, leg contacts, terrain, or obstacle traversal.
 - **No live mapping or localization:** geometry and targets are hardcoded. Dynamic people and changed surroundings are not represented.
@@ -172,7 +191,7 @@ configs/              Example configuration without device credentials
 deploy/               Model runtime and environment helper scripts
 docs/                 Setup, hardware notes, and development history
 reports/              Recorded smoke results and simulation screenshots
-robot/bridge_cpp/     Unverified read-only AS2 SDK probe source
+robot/bridge_cpp/     Hardware-tested read-only AS2 SDK probe source
 tests/                Unit and local HTTP regression tests
 TECH_PLAN_AS2_VLM.md  Original technical implementation plan
 ```
