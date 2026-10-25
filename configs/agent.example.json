@@ -1,0 +1,27 @@
+{
+  "simulation_mode": false,
+  "robot": {
+    "network_interface": "eth0",
+    "motion_enabled": false,
+    "tts_binary": "build/as2-probe/as2_tts",
+    "static_map_path": ""
+  },
+  "camera": {
+    "source": "opencv:0",
+    "hfov_deg": 90.0,
+    "offset_xyz": [0.30, 0.0, 0.12]
+  },
+  "vlm": {
+    "perception_backend": "ollama",
+    "planner_backend": "rules",
+    "endpoint": "http://127.0.0.1:11434",
+    "model": "qwen2.5vl:7b",
+    "api_key_env": "AS2_VLM_API_KEY",
+    "perception_interval_s": 8.0
+  },
+  "motion": {
+    "max_vx": 0.3,
+    "max_vyaw": 0.5
+  },
+  "home_pose": [0.0, 0.0, 0.0]
+}

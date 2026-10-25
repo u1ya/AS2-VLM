@@ -86,7 +86,7 @@ class OllamaBackend:
                 "model_installed": self.model in names, "model_digest": selected.get("digest"),
                 "inference_tested": False}
 
-    def chat_json(self, system, user, image=None, schema=None):
+    def chat_json(self, system, user, image=None, schema=None, num_predict=768):
         # Keep the contract beside the input across model-specific chat templates.
         message = {"role": "user", "content": system + "\nTASK INPUT:\n" + user}
         if image is not None:
@@ -95,7 +95,7 @@ class OllamaBackend:
             "model": self.model,
             "messages": [message],
             "stream": False, "format": schema or "json",
-            "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 768},
+            "options": {"temperature": 0, "num_ctx": 8192, "num_predict": num_predict},
             "keep_alive": "5m",
         })
         if response.get("done") is not True or response.get("done_reason") == "length":

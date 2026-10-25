@@ -8,3 +8,5 @@ configs/local.json
 .models/
 build/
 .runtime/
+configs/agent.local.json
+data/

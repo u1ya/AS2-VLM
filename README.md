@@ -33,3 +33,12 @@ python -m as2_vlm.preflight
 ```
 
 Код 1 означает незавершённые проверки (на Windows это ожидаемо). Параметр `--sdk-root` принимает путь к checkout SDK. Сборка и использование отдельного read-only AS2 probe описаны в [docs/sdk_notes.md](docs/sdk_notes.md).
+
+## Agent stack (EN)
+
+Semantic scene graph, goal planner, closed-loop recovery and the explainable dashboard live in `as2_vlm/agent/`; see [docs/agent_stack.md](docs/agent_stack.md).
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -e '.[agent]'
+.venv/bin/python -m as2_vlm.agent --sim
+```
