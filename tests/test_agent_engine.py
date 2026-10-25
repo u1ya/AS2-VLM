@@ -67,6 +67,68 @@ class EngineScenarioTests(unittest.TestCase):
     def tearDown(self):
         self.rig.close()
 
+    def test_walk_one_meter_relative_to_rotated_start(self):
+        adapter = self.rig.adapter
+        with adapter._lock:
+            adapter._pose = [1.2, 2.9, .35, .2]
+        origin = adapter.get_telemetry().pose
+        self.assertEqual(self.rig.run("go forward 1 meter"), "SUCCEEDED")
+        pose = adapter.get_telemetry().pose
+        progress = (pose.x - origin.x) * math.cos(origin.yaw) + (pose.y - origin.y) * math.sin(origin.yaw)
+        self.assertAlmostEqual(progress, 1, delta=.04)
+        self.assertAlmostEqual(pose.yaw, origin.yaw, delta=.03)
+
+    def test_full_turn_accumulates_rotation_across_wrap(self):
+        adapter = self.rig.adapter
+        original_move = adapter._move_impl
+        calls = []
+        def record(vx, vy, vyaw):
+            calls.append(vyaw)
+            return original_move(vx, vy, vyaw)
+        adapter._move_impl = record
+        start = adapter.get_telemetry().pose
+        self.assertEqual(self.rig.run("rotate by 360 degrees"), "SUCCEEDED")
+        final = adapter.get_telemetry().pose
+        self.assertGreater(len(calls), 50)
+        self.assertTrue(all(yaw > 0 for yaw in calls))
+        self.assertAlmostEqual(math.atan2(math.sin(final.yaw-start.yaw), math.cos(final.yaw-start.yaw)), 0, delta=.05)
+        self.assertLess(math.hypot(final.x-start.x, final.y-start.y), .01)
+
+    def test_turn_then_walk_uses_heading_at_step_execution(self):
+        adapter = self.rig.adapter
+        with adapter._lock:
+            adapter._pose = [1.2, 1.2, .35, 0]
+        start = adapter.get_telemetry().pose
+        self.assertEqual(self.rig.run("turn left and go forward 0.5 meters"), "SUCCEEDED")
+        final = adapter.get_telemetry().pose
+        self.assertAlmostEqual(final.x, start.x, delta=.04)
+        self.assertAlmostEqual(final.y - start.y, .5, delta=.04)
+
+    def test_relative_motion_stops_at_obstacle_without_recovery(self):
+        self.rig.adapter.inject_anomaly("box", x=1.6, y=.8)
+        self.assertEqual(self.rig.run("go forward 1 meter"), "FAILED")
+        self.assertNotIn("recovery", self.rig.kinds())
+        self.assertEqual(self.rig.adapter._cmd, [0, 0, 0])
+
+    def test_failed_relative_step_does_not_execute_the_rest(self):
+        calls = []
+        async def refuse(step):
+            calls.append(step.tool)
+            return False
+        self.rig.engine._step_relative = refuse
+        self.assertEqual(self.rig.run("turn left and go forward 1 meter"), "FAILED")
+        self.assertEqual(calls, ["rotate_relative"])
+        self.assertEqual(self.rig.engine.step_status, ["failed", "skipped"])
+
+    def test_text_stop_has_priority_over_busy_motion(self):
+        rig = self.rig
+        rig.assert_accepted(rig.engine.submit_goal("rotate by 360 degrees"))
+        time.sleep(.1)
+        rig.assert_accepted(rig.engine.submit_goal("stop"))
+        time.sleep(.1)
+        self.assertTrue(rig.engine._paused)
+        self.assertEqual(rig.adapter._cmd, [0, 0, 0])
+
     def test_multi_step_inspection_succeeds_and_reports(self):
         state = self.rig.run("Check if the back door is locked and make sure the stove is off")
         self.assertEqual(state, "SUCCEEDED")

@@ -52,6 +52,49 @@ of real robot navigation or the use of Damp as an emergency stop.
 
 ## Run it today (no robot, no model needed)
 
+### Relative motion commands
+
+The rule planner also accepts explicit primitives without a mapped target or VLM:
+
+```text
+go forward 1 meter
+go backward 0.5 meters
+rotate by 360 degrees
+rotate 360 degrees clockwise
+turn right
+turn left and go forward 0.5 meters
+Повернись направо и пройди вперед на метр
+stop
+```
+
+Walking uses a signed `walk_relative(distance_m)` step, maximum 2 m per step.
+Turning uses `rotate_relative(angle_rad)`, maximum 360 degrees per step; positive
+is left/counterclockwise. Without a direction, a positive angle means left.
+A bare turn left/right means 90 degrees. Units are required for numeric commands.
+These exact commands are parsed deterministically even when an LLM planner is selected.
+
+Relative origins are captured when each step starts, so a turn followed by a walk
+uses the new heading. Straight walking does not detour or invoke autonomous
+recovery: obstacles, stale telemetry, jumps, heading/lateral drift, timeout or
+no progress stop and fail the step. Remaining steps after a failed primitive are
+skipped. Full turns accumulate signed yaw increments across the +/-pi boundary,
+instead of treating the same final heading as already completed. Command `stop`
+pauses an active task even while the engine is busy.
+
+The numerical completion tolerance is 2 cm / 0.02 rad (smaller for tiny requests),
+not a guarantee of physical positioning accuracy. These primitives are verified
+in the kinematic simulator, not on the real robot. Real execution still requires
+an explicitly armed motion adapter and a fresh calibrated body-frame scan; the
+default live C++ sensor transport has no motion API and continues to reject commands.
+
+Use `./agent.ps1 -Sim -Port 8771` for a separate simulation while read-only live
+sensors remain on 8770. A primitive can legitimately stop if furniture is ahead;
+the default apartment's starting heading points toward the sofa. Turn toward
+free space before asking it to walk straight. A full rotation and the sequence
+`turn left and go forward 1 meter` were exercised through the mock HTTP API.
+After this update all 102 Python tests passed; the browser also displayed
+SUCCEEDED after an actual simulated full turn. No physical movement was requested.
+
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e '.[agent]'
 .venv/bin/python -m as2_vlm.agent --sim --fresh-map

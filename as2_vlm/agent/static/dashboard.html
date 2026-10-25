@@ -334,7 +334,7 @@ function showNode(n){const p=$("nodePanel");p.classList.add("on");
 addEventListener("resize",()=>{drawMap();drawOverlay()});
 
 // ---- explainability panels ------------------------------------------------------------------
-function argsOf(s){const a=[];if(s.target_name)a.push(s.target_name);if(s.x!=null)a.push(`x ${(+s.x).toFixed(1)}, y ${(+s.y).toFixed(1)}`);
+function argsOf(s){const a=[];if(s.distance_m!=null)a.push(`${s.distance_m} m`);if(s.angle_rad!=null)a.push(`${Math.round(s.angle_rad*180/Math.PI)}°`);if(s.target_name)a.push(s.target_name);if(s.x!=null)a.push(`x ${(+s.x).toFixed(1)}, y ${(+s.y).toFixed(1)}`);
   if(s.pitch!=null||s.roll!=null)a.push(`roll ${deg(s.roll)}°, pitch ${deg(s.pitch)}°, yaw ${deg(s.yaw)}°`);if(s.question)a.push(`“${s.question}”`);if(s.message)a.push(`“${s.message}”`);return a.join(" · ")}
 function render(){
   const s=S.snap;if(!s)return;const t=s.telemetry,sim=s.mode==="mock";

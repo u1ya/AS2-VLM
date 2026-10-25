@@ -63,6 +63,38 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual([s.tool for s in plan.steps], ["navigate_to", "return_home"])
         self.assertEqual((plan.steps[0].x, plan.steps[0].y), (3.5, 2.0))
 
+    def test_relative_motion_plans(self):
+        for text in ("go forward 1 meter", "walk forwards one metre", "пройди вперед на метр"):
+            plan = self.planner.plan(text, "rules")
+            self.assertEqual(plan.steps[0].tool, "walk_relative")
+            self.assertEqual(plan.steps[0].distance_m, 1)
+        plan = self.planner.plan("rotate by 360 degrees", "ollama")
+        self.assertEqual(plan.steps[0].tool, "rotate_relative")
+        self.assertAlmostEqual(plan.steps[0].angle_rad, 2 * math.pi)
+        self.assertEqual(self.planner._chats, {})  # exact primitives do not need a model
+
+    def test_relative_motion_sequences_and_directions(self):
+        plan = self.planner.plan("turn right and then go forward 1 meter and stop")
+        self.assertEqual([s.tool for s in plan.steps], ["rotate_relative", "walk_relative", "stop"])
+        self.assertAlmostEqual(plan.steps[0].angle_rad, -math.pi / 2)
+        self.assertEqual(self.planner.plan("go backward 0.5 m").steps[0].distance_m, -.5)
+        self.assertAlmostEqual(self.planner.plan("rotate 360 degrees clockwise").steps[0].angle_rad, -2 * math.pi)
+        self.assertAlmostEqual(self.planner.plan("turn by -90 degrees").steps[0].angle_rad, -math.pi / 2)
+        plan = self.planner.plan("Повернись направо и пройди вперед на метр")
+        self.assertEqual([s.tool for s in plan.steps], ["rotate_relative", "walk_relative"])
+
+    def test_relative_motion_invalid_units_limits_and_arguments(self):
+        for text in ("go forward 0 meters", "go forward 3 meters", "rotate by 361 degrees",
+                     "rotate by 0 degrees", "rotate right -90 degrees", "go forward 1 foot",
+                     "rotate by 90", "rotate left 90 degrees right"):
+            with self.subTest(text=text), self.assertRaises(PlanError):
+                self.planner.plan(text)
+        for fields in ({"tool": "walk_relative", "distance_m": math.inf},
+                       {"tool": "rotate_relative", "angle_rad": 0},
+                       {"tool": "stop", "distance_m": 1}):
+            with self.subTest(fields=fields), self.assertRaises(ValueError):
+                PlanStep(reasoning="invalid primitive", **fields)
+
     def test_ambiguous_and_unknown_targets_rejected(self):
         with self.assertRaisesRegex(PlanError, "ambiguous"):
             self.planner.plan("check the door", "rules")

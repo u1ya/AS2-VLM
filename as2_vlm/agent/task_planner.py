@@ -19,8 +19,11 @@ from ..vlm import VLMError
 from .semantic_map import normalize
 from .vlm_backends import build_chat, llm_schema
 
-TOOLS = ("navigate_to", "adjust_posture", "verify_visual_state", "speak", "stand_down", "return_home")
+TOOLS = ("navigate_to", "walk_relative", "rotate_relative", "stop", "adjust_posture", "verify_visual_state", "speak", "stand_down", "return_home")
 TOOL_FIELDS = {
+    "walk_relative": {"distance_m"},
+    "rotate_relative": {"angle_rad"},
+    "stop": set(),
     "navigate_to": {"target_name", "x", "y", "yaw"},
     "adjust_posture": {"roll", "pitch", "yaw"},
     "verify_visual_state": {"target_name", "question"},
@@ -28,7 +31,7 @@ TOOL_FIELDS = {
     "stand_down": set(),
     "return_home": set(),
 }
-OPTIONAL_FIELDS = ("target_name", "x", "y", "yaw", "roll", "pitch", "question", "message")
+OPTIONAL_FIELDS = ("target_name", "x", "y", "yaw", "roll", "pitch", "question", "message", "distance_m", "angle_rad")
 NOMINAL_BODY_HEIGHT_M = 0.35
 POSTURE_THRESHOLD_RAD = 0.3
 DEFAULT_STANDOFF = {"door": 1.0, "furniture": 1.1, "window": 1.2, "room": 0.0, "infrastructure": 0.0}
@@ -41,6 +44,8 @@ class PlanStep(BaseModel):
     x: Optional[float] = None
     y: Optional[float] = None
     yaw: Optional[float] = None
+    distance_m: Optional[float] = None
+    angle_rad: Optional[float] = None
     roll: Optional[float] = None
     pitch: Optional[float] = None
     question: Optional[str] = Field(default=None, max_length=200)
@@ -62,6 +67,10 @@ class PlanStep(BaseModel):
                 raise ValueError(f"{name} must not be empty")
         if self.tool == "navigate_to" and not self.target_name and (self.x is None or self.y is None):
             raise ValueError("navigate_to needs target_name or x and y")
+        if self.tool == "walk_relative" and (self.distance_m is None or not 0 < abs(self.distance_m) <= 2):
+            raise ValueError("walk_relative requires a nonzero distance within +/-2 metres")
+        if self.tool == "rotate_relative" and (self.angle_rad is None or not 0 < abs(self.angle_rad) <= 2 * math.pi):
+            raise ValueError("rotate_relative requires a nonzero angle within +/-360 degrees")
         if self.tool == "adjust_posture":
             if all(getattr(self, k) is None for k in ("roll", "pitch", "yaw")):
                 raise ValueError("adjust_posture needs roll, pitch or yaw")
@@ -94,6 +103,11 @@ PLANNER_PROMPT = """You are the task planner of a Unitree AS2 quadruped robot wo
 Turn the operator's goal into a short sequential plan using ONLY these tools:
 - navigate_to(target_name | x,y,yaw): walk to a mapped target, using its exact label from SCENE GRAPH
   (the robot computes a safe approach pose itself), or to explicit map coordinates in metres.
+- walk_relative(distance_m): walk straight relative to the heading AT EXECUTION, signed metres,
+  positive forward, negative backward, 0 < absolute distance <= 2.
+- rotate_relative(angle_rad): rotate the WHOLE robot, positive left/counterclockwise,
+  negative right/clockwise, 0 < absolute angle <= 2*pi. A full turn is NOT zero.
+- stop(): stop movement. Never substitute body-posture yaw for a relative turn.
 - adjust_posture(roll, pitch, yaw): tilt the standing body, radians, |roll|<=0.3 |pitch|<=0.35 |yaw|<=0.4.
   NEGATIVE pitch looks UP, positive pitch looks DOWN. Use it before inspecting targets mounted high
   (above ~0.8 m, e.g. door locks) and reset to 0,0,0 afterwards.
@@ -116,7 +130,7 @@ Example goal "is the bedroom window closed?" ->
 {"tool":"adjust_posture","target_name":null,"x":null,"y":null,"yaw":0,"roll":0,"pitch":0,"question":null,"message":null,"reasoning":"Neutral posture before walking."},
 {"tool":"speak","target_name":null,"x":null,"y":null,"yaw":null,"roll":null,"pitch":null,"question":null,"message":"Inspection report: {findings}","reasoning":"Report the result to the operator."}]}"""
 
-CLAUSE_SPLIT = re.compile(r"\s*(?:[,;!?]|(?<!\d)\.(?!\d)|\band then\b|\bthen\b|\band\b|\balso\b|\bafter that\b)\s*")
+CLAUSE_SPLIT = re.compile(r"\s*(?:[,;!?]|(?<!\d)\.(?!\d)|\band then\b|\bthen\b|\band\b|\balso\b|\bafter that\b|\bи\b|\bзатем\b)\s*")
 HOME_RE = re.compile(r"\b(return|go|come|head|walk|get)\s+(back\s+)?(home|to\s+(the\s+)?(dock|charger|charging dock|"
                      r"charging station|base))\b|\breturn\b.*\b(home|dock)\b|^(dock|go home|home)$")
 SIT_RE = re.compile(r"\b(sit|lie|lay)\s+down\b|\bstand\s+down\b")
@@ -124,6 +138,49 @@ SAY_RE = re.compile(r"^(?:say|announce|tell\s+(?:them|everyone|people|me))\s*:?\
 CHECK_RE = re.compile(r"\b(check|verify|inspect|see|look at|make sure|ensure|confirm|find out|whether)\b|^(is|are)\b")
 GO_RE = re.compile(r"\b(go|walk|navigate|move|head|patrol|visit|drive)\b")
 COORD_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
+
+
+def primitive_step(clause):
+    text = clause.strip().lower().replace("ё", "е")
+    text = re.sub(r"^please\s+", "", text)
+    if text in {"stop", "stop moving", "halt", "остановись", "стоп"}:
+        return PlanStep(tool="stop", reasoning="Operator requested a stop")
+    words = {"one": "1", "two": "2", "один": "1", "два": "2"}
+    text = re.sub(r"\b(?:one|two|один|два)\b", lambda m: words[m[0]], text)
+    walk = re.fullmatch(r"(?:go|walk|move|пройди|иди)\s+(forward|forwards|backward|backwards|back|вперед|назад)"
+                        r"\s+(?:(?:for|by|на)\s+)?(?:(\d+(?:\.\d+)?)\s*)?(meters?|metres?|m|метр[аов]*)", text)
+    if walk:
+        distance = float(walk[2] or 1)
+        if walk[1] in {"back", "backward", "backwards", "назад"}:
+            distance = -distance
+        if not 0 < abs(distance) <= 2:
+            raise PlanError("Relative walking distance must be greater than 0 and at most 2 metres")
+        return PlanStep(tool="walk_relative", distance_m=distance,
+                        reasoning="Walk the requested distance along the current heading")
+    turn = re.fullmatch(r"(?:rotate|turn|повернись|поверни)\s+(?:(left|right|clockwise|counterclockwise|налево|направо)\s+)?"
+                        r"(?:(?:by|на)\s+)?([+-]?\d+(?:\.\d+)?)\s*(degrees?|deg|°|radians?|rad|градус[аов]*)"
+                        r"(?:\s+(left|right|clockwise|counterclockwise|налево|направо))?", text)
+    if turn:
+        if turn[1] and turn[4] and turn[1] != turn[4]:
+            raise PlanError("Conflicting rotation directions")
+        direction = turn[1] or turn[4]
+        angle = float(turn[2])
+        if direction and angle < 0:
+            raise PlanError("Use either a signed angle or a direction, not both")
+        if turn[3] not in {"rad", "radian", "radians"}:
+            angle = math.radians(angle)
+        if direction in {"right", "clockwise", "направо"}:
+            angle = -angle
+        if not 0 < abs(angle) <= 2 * math.pi:
+            raise PlanError("Relative turn must be greater than 0 and at most 360 degrees")
+        return PlanStep(tool="rotate_relative", angle_rad=angle, reasoning="Rotate through the requested signed angle")
+    direction = re.fullmatch(r"(?:turn|повернись)\s+(left|right|налево|направо)", text)
+    if direction:
+        angle = math.pi / 2 * (-1 if direction[1] in {"right", "направо"} else 1)
+        return PlanStep(tool="rotate_relative", angle_rad=angle, reasoning="Make the requested quarter turn")
+    if re.match(r"^(?:(?:go|walk|move)\s+(?:forward|backward|back)|rotate|turn\s+(?:by|left|right|[+-]?\d))\b", text):
+        raise PlanError("Unsupported relative motion; specify metres or degrees/radians explicitly")
+    return None
 
 
 class TaskPlanner:
@@ -139,6 +196,11 @@ class TaskPlanner:
             raise PlanError("Goal must be 1-500 characters")
         goal = goal.strip()
         backend = backend or self.config.vlm.planner_backend
+        clauses = [c.strip() for c in CLAUSE_SPLIT.split(goal.lower()) if c and c.strip()]
+        primitives = [primitive_step(c) for c in clauses]
+        if primitives and all(primitives):
+            return self.check(TaskPlan(goal=goal, summary="Execute relative motion in order", planner="rules",
+                                       steps=primitives))
         if backend == "rules":
             steps, summary = self._plan_rules(goal, robot_pose)
         else:
@@ -281,6 +343,10 @@ class TaskPlanner:
         robot_xy = (robot_pose.x, robot_pose.y) if robot_pose else None
         steps, intent, verified, wants_home = [], None, False, False
         for clause in clauses:
+            primitive = primitive_step(clause)
+            if primitive:
+                steps.append(primitive)
+                continue
             if HOME_RE.search(clause):
                 wants_home = True
                 continue

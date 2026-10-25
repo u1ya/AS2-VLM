@@ -195,6 +195,9 @@ class ExecutionEngine:
         text = (text or "").strip()
         if not text or len(text) > 500:
             return {"accepted": False, "reason": "Command must be 1-500 characters"}
+        if text.lower().rstrip(".!?") in {"stop", "stop moving", "halt", "стоп", "остановись"}:
+            await self._override("stop")
+            return {"accepted": True, "paused": self._paused}
         if self.adapter.emergency_latched:
             return {"accepted": False, "reason": "Emergency stop is latched. Press STAND UP to recover first."}
         if self.is_busy():
@@ -250,6 +253,10 @@ class ExecutionEngine:
                 self.step_status[index] = "done" if ok else "failed"
                 if not ok:
                     failed.append(index)
+                    if step.tool in {"walk_relative", "rotate_relative"}:
+                        for following in range(index + 1, len(plan.steps)):
+                            self.step_status[following] = "skipped"
+                        break
                     if step.tool == "navigate_to" and key:
                         unreachable.add(key)
             if failed:
@@ -276,6 +283,11 @@ class ExecutionEngine:
 
     async def _execute_step(self, step):
         tool = step.tool
+        if tool in {"walk_relative", "rotate_relative"}:
+            return await self._step_relative(step)
+        if tool == "stop":
+            self.adapter.stop_move()
+            return True
         if tool == "navigate_to":
             return await self._step_navigate(step)
         if tool == "adjust_posture":
@@ -302,6 +314,80 @@ class ExecutionEngine:
         if tool == "return_home":
             return await self._return_home(step.reasoning)
         return False
+
+    async def _step_relative(self, step):
+        allowed, reason = self.adapter.motion_allowed()
+        if not allowed:
+            self.log.emit("safety", reason, level="error")
+            return False
+        telemetry = self.adapter.get_telemetry()
+        if not telemetry.connected or not telemetry.standing:
+            self.log.emit("safety", "Relative motion requires fresh telemetry and a standing robot", level="error")
+            return False
+        origin = telemetry.pose
+        turning = step.tool == "rotate_relative"
+        requested = step.angle_rad if turning else step.distance_m
+        sign, goal = (1 if requested > 0 else -1), abs(requested)
+        tolerance = min(.02, goal * .1)
+        maximum = self.limits.max_vyaw if turning else self.limits.max_vx
+        deadline = self.clock.now() + goal / max(maximum * .25, .01) + 10
+        previous_yaw, previous_xy = origin.yaw, (origin.x, origin.y)
+        accumulated, best, progress_time = 0.0, 0.0, self.clock.now()
+        self._set("EXECUTING", f"{step.tool}: {requested:.3f}", step.reasoning)
+        try:
+            while True:
+                before = self.clock.now()
+                await self._checkpoint()
+                paused_for = self.clock.now() - before
+                deadline += paused_for
+                progress_time += paused_for
+                now = self.clock.now()
+                telemetry = self.adapter.get_telemetry()
+                pose = telemetry.pose
+                if not telemetry.connected or not telemetry.standing or telemetry.blocked:
+                    return False
+                delta = wrap(pose.yaw - previous_yaw)
+                if abs(delta) > .5 or math.hypot(pose.x - previous_xy[0], pose.y - previous_xy[1]) > .15:
+                    self.log.emit("safety", "Odometry jumped during relative motion", level="error")
+                    return False
+                accumulated += delta
+                previous_yaw, previous_xy = pose.yaw, (pose.x, pose.y)
+                dx, dy = pose.x - origin.x, pose.y - origin.y
+                progress = sign * (accumulated if turning else dx * math.cos(origin.yaw) + dy * math.sin(origin.yaw))
+                if progress >= goal - tolerance:
+                    return True
+                if turning:
+                    if math.hypot(dx, dy) > .15:
+                        return False
+                elif abs(-dx * math.sin(origin.yaw) + dy * math.cos(origin.yaw)) > .12 or abs(wrap(pose.yaw - origin.yaw)) > .3:
+                    return False
+                scan = self.adapter.get_scan()
+                if self.adapter.kind != "mock" and (scan is None or time.time() - scan.timestamp > .5):
+                    self.log.emit("safety", "Relative motion requires a fresh calibrated body-frame scan", level="error")
+                    return False
+                if scan:
+                    if turning:
+                        blocked = any(math.isfinite(r) and 0 < r < self.limits.robot_radius_m + .1 for r in scan.ranges)
+                    else:
+                        hit = corridor_obstacle(scan, self.limits, heading=0 if sign > 0 else math.pi)
+                        blocked = hit is not None and hit[0] < goal - progress + self.limits.robot_radius_m + .05
+                    if blocked:
+                        self.log.emit("safety", "Relative motion stopped by obstacle scan", level="warning")
+                        return False
+                if progress > best + .01:
+                    best, progress_time = progress, now
+                if now > deadline or now - progress_time > self.limits.stall_time_s:
+                    self.log.emit("safety", "Relative motion timed out or made no progress", level="error")
+                    return False
+                rate = sign * min(maximum, max(.06, 1.5 * (goal - progress)))
+                command = (0.0, 0.0, rate) if turning else (rate, 0.0, max(-self.limits.max_vyaw, min(
+                    self.limits.max_vyaw, 1.5 * wrap(origin.yaw - pose.yaw))))
+                if not self.adapter.move(*command):
+                    return False
+                self.activity = f"{step.tool}: {progress:.2f} / {goal:.2f} {'rad' if turning else 'm'}"
+                await self.clock.sleep(1.0 / self.limits.control_hz)
+        finally:
+            self.adapter.stop_move()
 
     # ---- navigation -----------------------------------------------------------------
     async def _step_navigate(self, step):
