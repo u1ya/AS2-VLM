@@ -150,6 +150,17 @@ The separate `as2_walk_meter` test adds an odometry-based one-meter target, a 0.
 
 ## Testing and Evaluation
 
+Read-only camera capture was verified on AS2 on 2026-10-25 using `videohub`:
+four RGB JPEG frames at 1920 x 1080 decoded successfully. The separate
+`as2_camera_probe` tool and setup notes are in [Camera Verification](docs/camera.md).
+This does not enable camera-driven physical navigation. The current WSL robot
+interface is `eth0`; recheck routing before using older `eth1` examples.
+
+Read-only LiDAR access was also verified: approximately 9.7 Hz PointCloud2,
+81,633 finite XYZ points in the last observed cloud, plus IMU and lidar state
+messages with reported error code 0. The frame is `hesai_lidar`; the exact sensor
+model and calibration remain unconfirmed. See [LiDAR Verification](docs/lidar.md).
+
 ```bash
 python -m unittest discover -s tests -v
 python -m as2_vlm.evaluate

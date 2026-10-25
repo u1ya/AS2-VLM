@@ -2,6 +2,13 @@
 
 Session handoff: 2026-10-20. This file is the current operational summary;
 older progress entries describe historical states, not current capabilities.
+Update 2026-10-25: connection and read-only odometry reverified; the robot interface
+is now **eth0**. The RGB camera is confirmed through `videohub` at 1920 x 1080.
+See [Camera Verification](camera.md). Older eth1 commands below must use the current
+interface reported by `ip route get`; no automatic camera-driven motion is enabled.
+LiDAR also verified on 2026-10-25: PointCloud2, IMU and state messages received;
+approximately 9.7 Hz, frame `hesai_lidar` despite a Livox-named topic. See
+[LiDAR Verification](lidar.md) for measurements and read-only commands.
 Final verification: 45 Python tests and 2 C++ policy tests passed. Python tests
 required execution outside the restricted sandbox for temporary files and loopback sockets.
 
