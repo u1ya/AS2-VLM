@@ -59,3 +59,6 @@ sdk_return_code=0. В браузере отдельно показан сним�
 значения очищаются. HTTP endpoint ограничен loopback Host/Origin и отдельным
 заголовком. Тесты backend и HTTP добавлены; поток sportmodestate остаётся
 следующим этапом, а физическое управление не реализовано.
+## Агентный стек (2026-10-25)
+
+Добавлен пакет `as2_vlm/agent`: HAL (`MockAs2Adapter` / `RealUnitreeAs2Adapter` на unitree_sdk2py), семантическая карта (SQLite), планировщик целей (правила или LLM, схемы Pydantic), исполнение с восстановлением после блокировок и dashboard. Описание: [agent_stack.md](agent_stack.md). Проверено только в симуляции: 76 тестов прошли; живой Qwen2.5-VL 7B на синтетических кадрах выполнил detect/verify/diagnose/plan. На роботе адаптер не запускался.

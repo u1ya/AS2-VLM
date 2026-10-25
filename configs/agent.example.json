@@ -1,0 +1,30 @@
+{
+  "simulation_mode": false,
+  "robot": {
+    "transport": "cpp_readonly",
+    "network_interface": "eth0",
+    "motion_enabled": false,
+    "tts_binary": "",
+    "static_map_path": ""
+  },
+  "camera": {
+    "source": "videohub",
+    "width": 1920,
+    "height": 1080,
+    "hfov_deg": 90.0,
+    "offset_xyz": [0.30, 0.0, 0.12]
+  },
+  "vlm": {
+    "perception_backend": "disabled",
+    "planner_backend": "rules",
+    "endpoint": "http://127.0.0.1:11434",
+    "model": "qwen2.5vl:3b",
+    "api_key_env": "AS2_VLM_API_KEY",
+    "perception_interval_s": 8.0
+  },
+  "motion": {
+    "max_vx": 0.15,
+    "max_vyaw": 0.5
+  },
+  "home_pose": [0.0, 0.0, 0.0]
+}

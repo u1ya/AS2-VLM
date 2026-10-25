@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AS2 Mission Control</title>
+<style>
+:root{
+  --bg:#f4f5f7;--panel:#ffffff;--panel-2:#f8f9fb;--line:#dfe3e8;--text:#1b2127;--muted:#66717c;
+  --accent:#1f6feb;--accent-ink:#ffffff;--ok:#1a7f4b;--warn:#b26a00;--bad:#c4302b;--info:#4b5563;
+  --amber:#f2a516;--amber-ink:#2a1b00;--red:#d93025;--red-ink:#fff;--chip:#eef1f4;
+  --map-room:#eef2f6;--map-wall:#3d4752;--map-path:#1f6feb;--map-robot:#0f9d58;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1317;--panel:#161b21;--panel-2:#1b2128;--line:#2a323b;--text:#e6eaee;--muted:#93a0ad;
+  --accent:#4c8dff;--chip:#222a33;--map-room:#1d242c;--map-wall:#aab4bf;--map-path:#6aa1ff;--map-robot:#34c77b;
+  --shadow:none;color-scheme:dark;}}
+:root[data-theme="dark"]{--bg:#0f1317;--panel:#161b21;--panel-2:#1b2128;--line:#2a323b;--text:#e6eaee;--muted:#93a0ad;
+  --accent:#4c8dff;--chip:#222a33;--map-room:#1d242c;--map-wall:#aab4bf;--map-path:#6aa1ff;--map-robot:#34c77b;--shadow:none;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px}
+button:hover{filter:brightness(.97)}button:disabled{opacity:.5;cursor:not-allowed}
+select,input[type=text]{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 10px;min-width:0}
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:.2px}
+header .spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:6px 12px;background:transparent}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:12px;font-weight:600;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}
+.state-IDLE{color:var(--info)}.state-EXECUTING,.state-PLANNING{color:var(--accent)}.state-SUCCEEDED{color:var(--ok)}
+.state-RECOVERING,.state-PAUSED,.state-WAITING_FOR_HUMAN{color:var(--warn)}.state-FAILED,.state-ABORTED,.state-EMERGENCY{color:var(--bad)}
+main{max-width:1500px;margin:0 auto;padding:14px 16px 32px}
+.command{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:var(--shadow)}
+.command input{flex:1;border:0;background:transparent;font-size:15px;padding:8px 6px;outline:none}
+.mic{width:40px;height:40px;border-radius:50%;padding:0;display:grid;place-items:center;flex:none}
+.mic.live{background:var(--red);color:#fff;border-color:var(--red);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(217,48,37,.2)}}
+.send{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:8px 2px 14px}
+.chips button{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--chip);border-color:transparent}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,1fr);gap:14px;align-items:start}
+.col{display:grid;gap:14px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:0}
+.card>h2{display:flex;align-items:center;gap:8px;margin:0;padding:10px 14px;font-size:13px;font-weight:650;border-bottom:1px solid var(--line)}
+.card>h2 .meta{margin-left:auto;font-weight:500;color:var(--muted);font-size:12px}
+.body{padding:12px 14px}
+.camera{position:relative;background:#111;border-radius:0 0 12px 12px;overflow:hidden;aspect-ratio:4/3}
+.camera img,.camera canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.camera .empty{position:absolute;inset:0;display:grid;place-items:center;color:#9aa4ae;font-size:13px}
+#map{width:100%;height:auto;display:block;border-radius:0 0 12px 12px;cursor:crosshair}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding:6px 14px 10px}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px;background:var(--c)}
+.node-panel{border-top:1px solid var(--line);padding:10px 14px;display:none;gap:8px;flex-wrap:wrap;align-items:center}
+.node-panel.on{display:flex}
+.node-panel code{font-size:12px;background:var(--chip);padding:2px 6px;border-radius:6px}
+.safety{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px}
+.safety button{padding:12px 8px;font-weight:700;border-radius:10px;font-size:13px}
+.b-pause{background:var(--amber);color:var(--amber-ink);border-color:var(--amber)}
+.b-abort{background:var(--panel-2)}
+.b-emergency{grid-column:1/-1;background:var(--red);color:var(--red-ink);border-color:var(--red);font-size:14px;padding:14px}
+.b-small{font-size:12px;padding:6px 10px;font-weight:600}
+.safety .row{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.activity{font-size:16px;font-weight:650;margin:0 0 4px;overflow-wrap:anywhere}
+.why{color:var(--muted);margin:0 0 10px;overflow-wrap:anywhere}
+.why b{color:var(--text);font-weight:600}
+.meter{height:8px;border-radius:99px;background:var(--chip);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--ok);transition:width .3s}
+.meter-row{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.meter-row .meter{flex:1}
+.banner{display:none;margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(242,165,22,.15);color:var(--warn);font-weight:600}
+.banner.on{display:block}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.steps li{display:grid;grid-template-columns:22px 1fr;gap:8px;padding:8px;border-radius:8px;background:var(--panel-2)}
+.steps li.running{outline:2px solid var(--accent)}
+.steps .ico{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--chip);color:var(--muted)}
+.steps .done .ico,.steps li.done .ico{background:var(--ok);color:#fff}
+.steps li.failed .ico{background:var(--bad);color:#fff}.steps li.running .ico{background:var(--accent);color:#fff}
+.steps li.skipped .ico,.steps li.cancelled .ico{background:var(--muted);color:#fff}
+.steps .tool{font-weight:600}.steps .args{color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.steps .reason{font-size:12px;color:var(--muted);margin-top:2px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tile{background:var(--panel-2);border-radius:8px;padding:8px}
+.tile small{display:block;color:var(--muted);font-size:11px}
+.tile b{font-size:14px;overflow-wrap:anywhere}
+.log{max-height:360px;overflow:auto;padding:4px 0}
+.log div{padding:6px 14px;border-bottom:1px solid var(--line);font-size:12.5px}
+.log div:last-child{border-bottom:0}
+.log time{color:var(--muted);font-variant-numeric:tabular-nums;margin-right:6px}
+.kind{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:1px 6px;border-radius:5px;background:var(--chip);margin-right:6px}
+.log .warning .kind{background:rgba(242,165,22,.2);color:var(--warn)}.log .error .kind{background:rgba(217,48,37,.15);color:var(--bad)}
+.log .reason{display:block;color:var(--muted);margin-top:2px}
+.conf{font-size:11px;font-weight:700;color:var(--ok);margin-left:6px}
+.findings{display:grid;gap:6px}
+.finding{display:flex;gap:8px;align-items:flex-start;background:var(--panel-2);padding:8px;border-radius:8px}
+.badge{font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;color:#fff;background:var(--muted);flex:none}
+.badge.yes{background:var(--ok)}.badge.no{background:var(--bad)}.badge.uncertain{background:var(--warn)}
+.inject{display:flex;gap:8px;flex-wrap:wrap}
+.inject select{flex:1}
+.muted{color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;z-index:50}
+.toast.on{opacity:.95}
+.sim-only.hidden,.live-only.hidden{display:none}
+@media (max-width:980px){.grid{grid-template-columns:1fr}.col-right{order:-1}}
+@media (max-width:560px){main{padding:10px 12px 24px}header{padding:8px 12px}.tiles{grid-template-columns:1fr 1fr}.command{flex-wrap:wrap}.command input{flex-basis:100%;order:-1}}
+</style>
+</head>
+<body>
+<header>
+  <h1>AS2 Mission Control</h1>
+  <div class="seg" role="group" aria-label="Robot mode">
+    <button id="modeSim">Simulation (mock)</button><button id="modeLive">Live AS2 EDU</button>
+  </div>
+  <span class="pill"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></span>
+  <span class="pill" id="statePill">IDLE</span>
+  <span class="spacer"></span>
+  <span class="pill live-only hidden" id="armPill">Motion: disarmed</span>
+  <button class="b-small live-only hidden" id="armBtn">Arm motion</button>
+</header>
+<main>
+  <div class="command">
+    <button class="mic" id="mic" title="Speak a command" aria-label="Speak a command">🎤</button>
+    <input type="text" id="cmd" autocomplete="off" placeholder="Give a goal, e.g. “Check if the back door is locked and make sure the stove is off”">
+    <select id="lang" title="Speech language" aria-label="Speech language"><option value="en-US">EN</option><option value="ru-RU">RU</option></select>
+    <select id="planner" title="Planner" aria-label="Planner"><option value="rules">Rule planner</option><option value="ollama">LLM · Ollama</option><option value="openai_compatible">LLM · endpoint</option></select>
+    <button class="send" id="send">Send</button>
+  </div>
+  <div class="chips" id="chips">
+    <button>Check if the back door is locked and make sure the stove is off</button>
+    <button>Inspect the fire extinguisher, then return home</button>
+    <button>Go to the kitchen</button>
+    <button>Is the bedroom window closed?</button>
+    <button>Return home</button>
+  </div>
+  <div class="grid">
+    <div class="col">
+      <section class="card">
+        <h2>Camera <span class="meta" id="camMeta">—</span>
+          <label class="sim-only" style="font-weight:500;font-size:12px"><input type="checkbox" id="webcam"> Webcam</label></h2>
+        <div class="camera"><img id="cam" alt="Robot camera"><canvas id="overlay"></canvas><div class="empty" id="camEmpty">No camera frame</div></div>
+      </section>
+      <section class="card">
+        <h2>Semantic map <span class="meta" id="mapMeta">—</span></h2>
+        <canvas id="map" width="900" height="720" aria-label="Semantic map"></canvas>
+        <div class="legend" id="legend"></div>
+        <div class="node-panel" id="nodePanel"></div>
+      </section>
+    </div>
+    <div class="col col-right">
+      <section class="card">
+        <h2>Safety overrides <span class="meta">Space = stop</span></h2>
+        <div class="safety">
+          <button class="b-pause" id="pauseBtn">⏸ PAUSE / STOP MOVE</button>
+          <button class="b-abort" id="abortBtn">↩ ABORT &amp; RETURN</button>
+          <button class="b-emergency" id="emergencyBtn">⛔ EMERGENCY SIT DOWN + DAMP</button>
+          <div class="row"><button class="b-small" id="standBtn">Stand up / clear latch</button><span id="safetyNote"></span></div>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Now <span class="meta" id="backendMeta"></span></h2>
+        <div class="body">
+          <p class="activity" id="activity">Idle</p>
+          <p class="why" id="why"><b>Why:</b> waiting for a goal</p>
+          <div class="meter-row"><span>Decision confidence</span><div class="meter"><i id="confBar"></i></div><b id="confText">—</b></div>
+          <div class="muted" style="font-size:12px;margin-top:2px" id="confSource"></div>
+          <div class="banner" id="waitBanner"></div>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Plan <span class="meta" id="planMeta">no active plan</span></h2>
+        <div class="body"><ol class="steps" id="steps"></ol></div>
+      </section>
+      <section class="card">
+        <h2>Findings</h2>
+        <div class="body findings" id="findings"><span class="muted">No verifications yet</span></div>
+      </section>
+      <section class="card">
+        <h2>Telemetry <span class="meta" id="telMeta"></span></h2>
+        <div class="body tiles" id="tiles"></div>
+      </section>
+      <section class="card sim-only">
+        <h2>Fault injector <span class="meta">simulation only</span></h2>
+        <div class="body inject">
+          <select id="anomaly" aria-label="Anomaly">
+            <option value="close_next_door">Close the next door on the route</option>
+            <option value="box_on_path">Drop a box on the route</option>
+            <option value="close_door:kitchen_door">Close kitchen door</option>
+            <option value="close_door:hall_kitchen_door">Close hallway kitchen door</option>
+            <option value="close_door:utility_door">Close utility room door (only route)</option>
+            <option value="object_state:stove:on">Leave the stove ON</option>
+            <option value="clear">Human helps: open doors / remove boxes</option>
+          </select>
+          <button id="injectBtn">Inject anomaly</button>
+        </div>
+        <div class="body muted" style="padding-top:0;font-size:12px" id="anomalies">No active anomalies</div>
+      </section>
+      <section class="card">
+        <h2>Reasoning log <span class="meta"><label><input type="checkbox" id="voiceOut" checked> speak robot voice</label></span></h2>
+        <div class="log" id="log"></div>
+      </section>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast" role="status"></div>
+<script>
+const $ = id => document.getElementById(id);
+const S = {snap:null, map:null, mapVersion:-1, selected:null, logAtBottom:true, recognizing:false};
+const CAT = {door:"#b0673a",window:"#3b9dd8",safety:"#d93025",appliance:"#7b61ff",furniture:"#8d6e63",electronics:"#455a64",
+  infrastructure:"#0f9d58",hazard:"#f29900",obstacle:"#e8710a",person:"#c2185b",room:"#9aa4ae",other:"#607d8b"};
+const STATE_DOOR = {open:"#0f9d58",closed:"#d93025",locked:"#a50e0e"};
+
+function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("on"),3500)}
+async function post(path, body){
+  try{const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data=await r.json().catch(()=>({}));if(!r.ok){toast(data.error||("HTTP "+r.status));return null}
+    if(data.accepted===false||data.ok===false){toast(data.reason||"Rejected")}return data}
+  catch(e){toast("Connection error: "+e.message);return null}}
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const deg = r => Math.round((r||0)*180/Math.PI);
+
+// ---- commands & voice -------------------------------------------------------------------
+function sendCommand(text, source="text"){
+  text=(text||"").trim(); if(!text) return;
+  post("/api/command",{text,source,planner:$("planner").value}).then(d=>{if(d&&d.accepted){$("cmd").value="";toast("Goal accepted")}})}
+$("send").onclick=()=>sendCommand($("cmd").value);
+$("cmd").addEventListener("keydown",e=>{if(e.key==="Enter")sendCommand($("cmd").value)});
+$("chips").addEventListener("click",e=>{if(e.target.tagName==="BUTTON"){$("cmd").value=e.target.textContent;$("cmd").focus()}});
+const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null;
+$("mic").onclick=()=>{
+  if(!SR){toast("Speech recognition is not supported in this browser (try Chrome or Edge)");return}
+  if(S.recognizing){rec.stop();return}
+  rec=new SR();rec.lang=$("lang").value;rec.interimResults=true;rec.maxAlternatives=1;let finalText="";
+  rec.onstart=()=>{S.recognizing=true;$("mic").classList.add("live")};
+  rec.onresult=e=>{let interim="";for(const r of e.results){if(r.isFinal)finalText+=r[0].transcript;else interim+=r[0].transcript}$("cmd").value=(finalText+" "+interim).trim()};
+  rec.onerror=e=>toast("Mic: "+e.error);
+  rec.onend=()=>{S.recognizing=false;$("mic").classList.remove("live");if(finalText.trim())sendCommand(finalText,"voice")};
+  rec.start()};
+function speakOut(text){if(!$("voiceOut").checked||!window.speechSynthesis)return;const u=new SpeechSynthesisUtterance(text);u.lang="en-US";speechSynthesis.speak(u)}
+
+// ---- overrides ----------------------------------------------------------------------------
+$("pauseBtn").onclick=()=>post("/api/override",{action:S.snap&&S.snap.paused?"resume":"pause"});
+$("abortBtn").onclick=()=>post("/api/override",{action:"abort_return"});
+$("emergencyBtn").onclick=()=>post("/api/override",{action:"emergency_sit"});
+$("standBtn").onclick=()=>post("/api/override",{action:"stand_up"});
+$("armBtn").onclick=()=>post("/api/override",{action:S.snap&&S.snap.telemetry.armed?"disarm":"arm"});
+document.addEventListener("keydown",e=>{if(e.code==="Space"&&!["INPUT","SELECT","TEXTAREA","BUTTON"].includes(document.activeElement.tagName)){e.preventDefault();$("pauseBtn").click()}});
+$("modeSim").onclick=()=>switchMode(true);$("modeLive").onclick=()=>switchMode(false);
+async function switchMode(sim){const d=await post("/api/mode",{simulation:sim});if(d&&d.ok){S.mapVersion=-1;toast(sim?"Simulation mode":"Live AS2 mode")}}
+$("injectBtn").onclick=()=>{const [kind,a,b]=$("anomaly").value.split(":");let params={};
+  if(kind==="close_door")params={door_id:a};if(kind==="object_state")params={object_id:a,state:b};
+  post("/api/anomaly",{kind,params}).then(d=>{if(d&&d.ok)toast(d.description)})};
+
+// ---- webcam (simulation: real images for a real VLM) ---------------------------------------
+let camStream=null,camTimer=null;
+$("webcam").onchange=async e=>{
+  if(e.target.checked){try{camStream=await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});
+      const v=document.createElement("video");v.srcObject=camStream;v.muted=true;await v.play();const c=document.createElement("canvas");c.width=640;c.height=480;
+      camTimer=setInterval(()=>{c.getContext("2d").drawImage(v,0,0,640,480);c.toBlob(b=>b&&fetch("/api/frame",{method:"POST",body:b}),"image/jpeg",.8)},700);
+      toast("Webcam frames are sent to the mock camera (needs camera.source = webcam)")}
+    catch(err){toast("Webcam: "+err.message);e.target.checked=false}}
+  else{clearInterval(camTimer);camStream&&camStream.getTracks().forEach(t=>t.stop())}};
+
+// ---- camera feed ----------------------------------------------------------------------------
+const cam=$("cam");let camBusy=false;
+function nextFrame(){if(document.hidden||camBusy)return;camBusy=true;cam.src="/api/camera.jpg?t="+Date.now()}
+cam.onload=()=>{camBusy=false;$("camEmpty").style.display="none";drawOverlay();setTimeout(nextFrame,180)};
+cam.onerror=()=>{camBusy=false;$("camEmpty").style.display="grid";setTimeout(nextFrame,1000)};
+document.addEventListener("visibilitychange",nextFrame);
+function drawOverlay(){
+  const cv=$("overlay"),box=cv.getBoundingClientRect(),dpr=devicePixelRatio||1;cv.width=box.width*dpr;cv.height=box.height*dpr;
+  const g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,box.width,box.height);
+  if(!S.snap||!cam.naturalWidth)return;
+  const s=Math.min(box.width/cam.naturalWidth,box.height/cam.naturalHeight),w=cam.naturalWidth*s,h=cam.naturalHeight*s,ox=(box.width-w)/2,oy=(box.height-h)/2;
+  g.font="600 12px system-ui";
+  for(const d of S.snap.detections||[]){const [x1,y1,x2,y2]=d.bbox;const x=ox+x1*w,y=oy+y1*h,bw=(x2-x1)*w,bh=(y2-y1)*h;
+    const col=d.highlight?"#ffd400":(CAT[d.category]||"#00e0ff");g.lineWidth=d.highlight?3:2;g.strokeStyle=col;g.strokeRect(x,y,bw,bh);
+    const tag=`${d.label}${d.state&&d.state!=="unknown"?" · "+d.state:""} · ${Math.round(d.confidence*100)}%`;
+    const tw=g.measureText(tag).width+8;g.fillStyle=col;g.fillRect(x,Math.max(oy,y-18),tw,17);g.fillStyle="#000";g.fillText(tag,x+4,Math.max(oy,y-18)+13)}}
+
+// ---- map --------------------------------------------------------------------------------------
+async function loadMap(){try{const r=await fetch("/api/map");S.map=await r.json();S.mapVersion=S.map.version;renderLegend();drawMap()}catch(e){}}
+function renderLegend(){const cats=new Set((S.map.nodes||[]).map(n=>n.category).filter(c=>c!=="room"));
+  $("legend").innerHTML=[...cats].map(c=>`<span style="--c:${CAT[c]||"#888"}">${c}</span>`).join("")+`<span style="--c:var(--map-path)">planned path</span>`;
+  $("mapMeta").textContent=`${(S.map.nodes||[]).filter(n=>n.category!=="room").length} objects · v${S.map.version}`}
+function mapFrame(cv){const m=S.map;let b=m.static?m.static.bounds:null;
+  if(!b){const pts=(m.nodes||[]).map(n=>n.coords);const p=S.snap?S.snap.telemetry.pose:{x:0,y:0};pts.push([p.x,p.y]);
+    const xs=pts.map(q=>q[0]),ys=pts.map(q=>q[1]);b=[Math.min(...xs)-2,Math.min(...ys)-2,Math.max(...xs)+2,Math.max(...ys)+2]}
+  const pad=26,W=cv.width,H=cv.height,s=Math.min((W-2*pad)/(b[2]-b[0]),(H-2*pad)/(b[3]-b[1]));
+  return {s,X:x=>pad+(x-b[0])*s,Y:y=>H-pad-(y-b[1])*s,inv:(px,py)=>[(px-pad)/s+b[0],(H-pad-py)/s+b[1]]}}
+function drawMap(){
+  const cv=$("map"),box=cv.getBoundingClientRect(),dpr=devicePixelRatio||1;const W=Math.max(320,box.width),H=W*0.78;
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+"px";const g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);
+  const css=getComputedStyle(document.documentElement),c=k=>css.getPropertyValue(k).trim();
+  g.fillStyle=c("--panel");g.fillRect(0,0,W,H);if(!S.map)return;
+  const f=mapFrame({width:W,height:H});S.frame=f;const st=S.map.static;
+  if(st){g.font="600 12px system-ui";g.textAlign="center";
+    for(const r of st.rooms){const [x1,y1,x2,y2]=r.bounds;g.fillStyle=c("--map-room");g.fillRect(f.X(x1),f.Y(y2),(x2-x1)*f.s,(y2-y1)*f.s);
+      g.fillStyle=c("--muted");g.fillText(r.name.toUpperCase(),f.X((x1+x2)/2),f.Y(y2)+16)}
+    g.fillStyle="rgba(141,110,99,.18)";for(const fu of st.furniture){const [cx,cy]=fu.center,[hx,hy]=fu.half;g.fillRect(f.X(cx-hx),f.Y(cy+hy),2*hx*f.s,2*hy*f.s)}
+    g.strokeStyle=c("--map-wall");g.lineWidth=3;g.lineCap="round";for(const w of st.walls){g.beginPath();g.moveTo(f.X(w[0]),f.Y(w[1]));g.lineTo(f.X(w[2]),f.Y(w[3]));g.stroke()}
+    const doorNodes={};for(const n of S.map.nodes)if(n.extra&&n.extra.door_id)doorNodes[n.extra.door_id]=n;
+    for(const d of st.doors){const n=doorNodes[d.id],state=n?n.state:"unknown";g.strokeStyle=STATE_DOOR[state]||"#b0673a";g.lineWidth=state==="open"||state==="unknown"?2:6;
+      g.setLineDash(state==="open"||state==="unknown"?[4,4]:[]);g.beginPath();g.moveTo(f.X(d.segment[0]),f.Y(d.segment[1]));g.lineTo(f.X(d.segment[2]),f.Y(d.segment[3]));g.stroke();g.setLineDash([])}}
+  const truth=S.map.sim_truth;if(truth){g.setLineDash([3,3]);g.strokeStyle="#e8710a";g.lineWidth=1.5;
+    for(const bx of truth.boxes){const [x,y]=bx.center;g.strokeRect(f.X(x-bx.half),f.Y(y+bx.half),2*bx.half*f.s,2*bx.half*f.s)}g.setLineDash([])}
+  const snap=S.snap;
+  if(snap&&snap.path&&snap.path.length>1){g.strokeStyle=c("--map-path");g.lineWidth=2.5;g.beginPath();snap.path.forEach((p,i)=>i?g.lineTo(f.X(p[0]),f.Y(p[1])):g.moveTo(f.X(p[0]),f.Y(p[1])));g.stroke();
+    g.fillStyle=c("--map-path");for(const p of snap.path.slice(1)){g.beginPath();g.arc(f.X(p[0]),f.Y(p[1]),3,0,7);g.fill()}}
+  if(snap&&snap.nav_goal){const [x,y]=snap.nav_goal;g.strokeStyle=c("--map-path");g.lineWidth=2;g.beginPath();g.arc(f.X(x),f.Y(y),9,0,7);g.stroke()}
+  g.textAlign="left";g.font="11px system-ui";
+  for(const n of S.map.nodes){if(n.category==="room")continue;const x=f.X(n.coords[0]),y=f.Y(n.coords[1]);
+    g.globalAlpha=0.35+0.65*n.confidence;g.fillStyle=CAT[n.category]||"#607d8b";g.beginPath();g.arc(x,y,n.id===S.selected?8:5.5,0,7);g.fill();g.globalAlpha=1;
+    if(n.id===S.selected){g.strokeStyle=c("--text");g.lineWidth=2;g.stroke()}
+    g.fillStyle=c("--text");const label=n.label+(n.state&&n.state!=="unknown"?` (${n.state})`:"");g.fillText(label,x+8,y+4)}
+  if(snap){const p=snap.telemetry.pose,x=f.X(p.x),y=f.Y(p.y),r=Math.max(9,0.3*f.s);
+    g.save();g.translate(x,y);g.rotate(-p.yaw);g.fillStyle=c("--map-robot");g.beginPath();g.moveTo(r*1.4,0);g.lineTo(-r,-r*0.8);g.lineTo(-r*0.5,0);g.lineTo(-r,r*0.8);g.closePath();g.fill();
+    g.globalAlpha=.15;g.beginPath();g.moveTo(0,0);g.arc(0,0,r*4,-Math.PI/4,Math.PI/4);g.closePath();g.fill();g.restore()}}
+$("map").addEventListener("click",e=>{if(!S.frame||!S.map)return;const b=e.target.getBoundingClientRect(),px=e.clientX-b.left,py=e.clientY-b.top;
+  let best=null;for(const n of S.map.nodes){if(n.category==="room")continue;const d=Math.hypot(S.frame.X(n.coords[0])-px,S.frame.Y(n.coords[1])-py);if(d<14&&(!best||d<best[0]))best=[d,n]}
+  if(best){S.selected=best[1].id;showNode(best[1])}else{S.selected=null;$("nodePanel").classList.remove("on");const [x,y]=S.frame.inv(px,py);$("cmd").value=`Go to ${x.toFixed(1)}, ${y.toFixed(1)}`;$("cmd").focus()}
+  drawMap()});
+function showNode(n){const p=$("nodePanel");p.classList.add("on");
+  p.innerHTML=`<b>${esc(n.label)}</b><code>${esc(n.id)}</code><span class="muted">${esc(n.category)} · ${esc(n.room||"-")} · [${n.coords.map(v=>v.toFixed(2)).join(", ")}] · state <b>${esc(n.state)}</b> · conf ${Math.round(n.confidence*100)}% · seen ${n.observations}×</span>
+  <span style="flex:1"></span><button class="b-small" data-go>Go here</button><button class="b-small" data-check>Check state</button>`;
+  p.querySelector("[data-go]").onclick=()=>sendCommand(`Go to the ${n.label}`,"map");
+  p.querySelector("[data-check]").onclick=()=>sendCommand(`Check the ${n.label}`,"map")}
+addEventListener("resize",()=>{drawMap();drawOverlay()});
+
+// ---- explainability panels ------------------------------------------------------------------
+function argsOf(s){const a=[];if(s.target_name)a.push(s.target_name);if(s.x!=null)a.push(`x ${(+s.x).toFixed(1)}, y ${(+s.y).toFixed(1)}`);
+  if(s.pitch!=null||s.roll!=null)a.push(`roll ${deg(s.roll)}°, pitch ${deg(s.pitch)}°, yaw ${deg(s.yaw)}°`);if(s.question)a.push(`“${s.question}”`);if(s.message)a.push(`“${s.message}”`);return a.join(" · ")}
+function render(){
+  const s=S.snap;if(!s)return;const t=s.telemetry,sim=s.mode==="mock";
+  for(const id of ["send","mic","pauseBtn","abortBtn","emergencyBtn","standBtn"]){$(id).disabled=!!s.read_only}
+  $("modeSim").classList.toggle("on",sim);$("modeLive").classList.toggle("on",!sim);
+  document.querySelectorAll(".sim-only").forEach(e=>e.classList.toggle("hidden",!sim));
+  document.querySelectorAll(".live-only").forEach(e=>e.classList.toggle("hidden",sim));
+  const sp=$("statePill");sp.textContent=s.paused?"PAUSED":s.state.replaceAll("_"," ");sp.className="pill state-"+(s.paused?"PAUSED":s.state);
+  $("armPill").textContent=!t.motion_enabled?"Motion disabled (config)":t.armed?"Motion: ARMED":"Motion: disarmed";
+  $("armBtn").textContent=t.armed?"Disarm":"Arm motion";$("armBtn").disabled=!t.motion_enabled;
+  $("pauseBtn").textContent=s.paused?"▶ RESUME":"⏸ PAUSE / STOP MOVE";
+  $("safetyNote").textContent=t.emergency_latched?"Emergency latched":(t.notes||[]).join(" · ");
+  $("activity").textContent=s.activity||"Idle";
+  $("why").innerHTML=s.reason?`<b>Why:</b> ${esc(s.reason)}`:(s.goal?`<b>Goal:</b> ${esc(s.goal)}`:"<b>Why:</b> waiting for a goal");
+  const conf=s.confidence;$("confBar").style.width=conf==null?"0":(conf*100)+"%";$("confBar").style.background=conf==null?"":conf>.7?"var(--ok)":conf>.4?"var(--amber)":"var(--red)";
+  $("confText").textContent=conf==null?"—":Math.round(conf*100)+"%";$("confSource").textContent=s.confidence_source||"";
+  $("waitBanner").classList.toggle("on",!!s.waiting_for);$("waitBanner").textContent=s.waiting_for?"🙋 Waiting for a person to "+s.waiting_for:"";
+  $("backendMeta").textContent=`perception: ${s.perception_backend} · planner: ${s.planner_backend}`;
+  const plan=s.plan;$("planMeta").textContent=plan?`${plan.planner} · ${plan.steps.length} steps`:"no active plan";
+  $("steps").innerHTML=plan?plan.steps.map((st,i)=>`<li class="${st.status}"><span class="ico">${st.status==="done"?"✓":st.status==="failed"?"!":st.status==="skipped"||st.status==="cancelled"?"–":i+1}</span>
+    <div><div class="tool">${esc(st.tool)}</div><div class="args">${esc(argsOf(st))}</div><div class="reason">↳ ${esc(st.reasoning)}</div></div></li>`).join(""):"";
+  $("findings").innerHTML=(s.findings||[]).length?s.findings.map(f=>`<div class="finding"><span class="badge ${f.answer}">${f.answer.toUpperCase()}</span>
+    <div><b>${esc(f.target)}</b>: ${esc(f.state)} <span class="conf">${Math.round(f.confidence*100)}%</span><div class="muted" style="font-size:12px">${esc(f.question)} — ${esc(f.evidence)}</div></div></div>`).join(""):'<span class="muted">No verifications yet</span>';
+  const p=t.pose;const tiles=[["Battery",t.battery_pct==null?"n/a":t.battery_pct.toFixed(1)+" %"],["Gait",t.gait_mode],["FSM",t.fsm_mode],
+    ["Pose",`${p.x.toFixed(2)}, ${p.y.toFixed(2)}`],["Heading",deg(p.yaw)+"°"],["Velocity",s.read_only?"unverified axes":`${t.velocity[0].toFixed(2)} m/s · ${t.velocity[2].toFixed(2)} r/s`],
+    ["Body euler",t.body_euler.map(v=>deg(v)+"°").join(" / ")],["Standing",t.standing?"yes":"no"],["Contact",s.read_only?"unknown":t.blocked?"BLOCKED":"clear"]];
+  if(s.read_only){const l=s.sensors||{};tiles.push(["LiDAR",l.connected?`${Math.round(l.points||0).toLocaleString()} points`:"stale / unavailable"],["Cloud rate",Number.isFinite(l.hz)?l.hz.toFixed(1)+" Hz":"n/a"],["LiDAR frame",l.frame||"unknown"])}
+  $("tiles").innerHTML=tiles.map(([k,v])=>`<div class="tile"><small>${k}</small><b>${esc(v)}</b></div>`).join("");
+  $("telMeta").textContent=t.connected?(sim?"simulated":"SportModeState live"):"no state stream";
+  $("anomalies").textContent=(s.sim_anomalies||[]).length?"Active: "+s.sim_anomalies.join(" · "):"No active anomalies";
+  $("camMeta").textContent=s.detection_frame?`VLM overlay from frame #${s.detection_frame}`:"—";
+  if(s.map_version!==S.mapVersion&&!S.mapLoading){S.mapLoading=true;setTimeout(()=>{S.mapLoading=false;loadMap()},400)}
+  drawMap()}
+function addLog(e){const box=$("log"),div=document.createElement("div");div.className=e.level;
+  const time=new Date(e.time*1000).toLocaleTimeString([], {hour12:false});
+  div.innerHTML=`<time>${time}</time><span class="kind">${esc(e.kind)}</span>${esc(e.message)}${e.confidence!=null?`<span class="conf">${Math.round(e.confidence*100)}%</span>`:""}${e.reason?`<span class="reason">↳ why: ${esc(e.reason)}</span>`:""}`;
+  box.appendChild(div);while(box.children.length>300)box.firstChild.remove();if(S.logAtBottom)box.scrollTop=box.scrollHeight}
+$("log").addEventListener("scroll",e=>{const b=e.target;S.logAtBottom=b.scrollHeight-b.scrollTop-b.clientHeight<30});
+
+// ---- live stream ----------------------------------------------------------------------------
+let lastSeq=0;
+function connect(){const es=new EventSource("/api/events");
+  es.onopen=()=>{$("connDot").className="dot ok";$("connText").textContent="Connected"};
+  es.onerror=()=>{$("connDot").className="dot bad";$("connText").textContent="Reconnecting…"};
+  es.addEventListener("state",m=>{S.snap=JSON.parse(m.data);render()});
+  es.addEventListener("log",m=>{const e=JSON.parse(m.data);if(e.seq<=lastSeq)return;const live=lastSeq>0&&Date.now()/1000-e.time<5;lastSeq=e.seq;addLog(e);if(e.kind==="speech"&&live)speakOut(e.message)})}
+connect();loadMap();nextFrame();
+</script>
+</body>
+</html>

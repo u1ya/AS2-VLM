@@ -1,0 +1,15 @@
+{
+  "simulation_mode": false,
+  "ui_host": "127.0.0.1",
+  "ui_port": 8770,
+  "robot": {
+    "transport": "cpp_readonly",
+    "network_interface": "eth0",
+    "motion_enabled": false,
+    "wsl_distro": "Ubuntu-22.04",
+    "sensor_binary": "build/as2-probe/as2_sensor_stream"
+  },
+  "camera": {"source": "videohub", "width": 1920, "height": 1080},
+  "vlm": {"model": "qwen2.5vl:3b", "perception_backend": "disabled", "perception_interval_s": 8.0},
+  "motion": {"max_vx": 0.15}
+}

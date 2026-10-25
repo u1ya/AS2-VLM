@@ -1,5 +1,10 @@
 # Resume the AS2 VLM Project
 
+Latest integration 2026-10-25: SLAI-VLM/main (629a9e6) merged into
+`codex/integrate-slai-sensors`, preserving the AS2-VLM hardware work. Start the
+new panel with `./agent.ps1` in PowerShell; live sensors are read-only. Use
+`./agent.ps1 -Sim` for the imported simulator. Details: [agent_stack.md](agent_stack.md).
+
 Session handoff: 2026-10-20. This file is the current operational summary;
 older progress entries describe historical states, not current capabilities.
 Update 2026-10-25: connection and read-only odometry reverified; the robot interface

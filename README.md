@@ -208,3 +208,20 @@ TECH_PLAN_AS2_VLM.md  Original technical implementation plan
 ```
 
 Further reading: [Technical Plan](TECH_PLAN_AS2_VLM.md), [Simulator Notes](docs/simulator.md), [SDK Notes](docs/sdk_notes.md), and [Hardware Inventory](docs/hardware_inventory.md). Supporting documents are currently mostly in Russian; progress notes include historical development stages.
+## Agent stack (EN)
+
+This checkout includes SLAI-VLM/main at `629a9e6`, merged with the verified local
+hardware changes. On this Windows/WSL setup, run `./agent.ps1` for the live
+read-only sensor dashboard at http://127.0.0.1:8770/, or `./agent.ps1 -Sim` for
+simulated goals. Do not run both on the same port. The sensor profile uses
+videohub JPEGs at 1920x1080 and live LiDAR metadata from the `hesai_lidar` frame.
+It has no robot motion API and does not require a running VLM. Optional Ollama
+uses the installed `qwen2.5vl:3b`. Calibration and camera/LiDAR fusion are still
+required before real navigation. See [Agent Setup](docs/agent_stack.md).
+
+Semantic scene graph, goal planner, closed-loop recovery and the explainable dashboard live in `as2_vlm/agent/`; see [docs/agent_stack.md](docs/agent_stack.md).
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -e '.[agent]'
+.venv/bin/python -m as2_vlm.agent --sim
+```
