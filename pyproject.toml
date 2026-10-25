@@ -11,7 +11,7 @@ dependencies = []
 
 [project.optional-dependencies]
 vision = ["Pillow>=10,<13"]
-agent = ["pydantic>=2.7,<3", "Pillow>=10,<13"]
+agent = ["pydantic>=2.7,<3", "Pillow>=10,<13", "numpy>=1.24,<3"]
 robot = ["unitree_sdk2py", "opencv-python>=4.8"]
 
 [tool.setuptools.packages.find]

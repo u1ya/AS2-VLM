@@ -210,6 +210,10 @@ TECH_PLAN_AS2_VLM.md  Original technical implementation plan
 Further reading: [Technical Plan](TECH_PLAN_AS2_VLM.md), [Simulator Notes](docs/simulator.md), [SDK Notes](docs/sdk_notes.md), and [Hardware Inventory](docs/hardware_inventory.md). Supporting documents are currently mostly in Russian; progress notes include historical development stages.
 ## Agent stack (EN)
 
+The live dashboard also renders a real LiDAR XY return-density projection with
+height filtering and private snapshot export. It is a stationary sensor-frame
+view, not global SLAM or known free space. See [Local Geometry](docs/local_geometry.md).
+
 This checkout includes SLAI-VLM/main at `629a9e6`, merged with the verified local
 hardware changes. On this Windows/WSL setup, run `./agent.ps1` for the live
 read-only sensor dashboard at http://127.0.0.1:8770/, or `./agent.ps1 -Sim` for

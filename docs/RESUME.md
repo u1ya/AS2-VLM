@@ -1,5 +1,10 @@
 # Resume the AS2 VLM Project
 
+Latest geometric milestone: the live panel at 8770 now renders real LiDAR XYZ as
+a stationary sensor-frame XY return-density view, with a height filter and private
+snapshot export. Read [local_geometry.md](local_geometry.md) before interpreting it
+as a map. It is not SLAM and never enables motion or assumes dark cells are free.
+
 Latest integration 2026-10-25: SLAI-VLM/main (629a9e6) merged into
 `codex/integrate-slai-sensors`, preserving the AS2-VLM hardware work. Start the
 new panel with `./agent.ps1` in PowerShell; live sensors are read-only. Use

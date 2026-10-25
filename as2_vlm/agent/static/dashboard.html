@@ -146,7 +146,13 @@ main{max-width:1500px;margin:0 auto;padding:14px 16px 32px}
         <div class="camera"><img id="cam" alt="Robot camera"><canvas id="overlay"></canvas><div class="empty" id="camEmpty">No camera frame</div></div>
       </section>
       <section class="card">
-        <h2>Semantic map <span class="meta" id="mapMeta">—</span></h2>
+        <h2><span id="mapTitle">Semantic map</span> <span class="meta" id="mapMeta">—</span></h2>
+        <div class="row hidden" id="geometryTools" style="padding:8px 14px;flex-wrap:wrap">
+          <label>Z min <input id="zMin" type="number" value="-0.1" min="-10" max="10" step="0.1" style="width:72px"></label>
+          <label>Z max <input id="zMax" type="number" value="1.8" min="-10" max="10" step="0.1" style="width:72px"></label>
+          <button class="b-small" id="heightSlice">Apply</button>
+          <button class="b-small" id="saveGeometry">Save Snapshot</button>
+        </div>
         <canvas id="map" width="900" height="720" aria-label="Semantic map"></canvas>
         <div class="legend" id="legend"></div>
         <div class="node-panel" id="nodePanel"></div>
@@ -285,8 +291,18 @@ function drawOverlay(){
     const tw=g.measureText(tag).width+8;g.fillStyle=col;g.fillRect(x,Math.max(oy,y-18),tw,17);g.fillStyle="#000";g.fillText(tag,x+4,Math.max(oy,y-18)+13)}}
 
 // ---- map --------------------------------------------------------------------------------------
-async function loadMap(){try{const r=await fetch("/api/map");S.map=await r.json();S.mapVersion=S.map.version;renderLegend();drawMap()}catch(e){}}
+async function loadMap(){try{const r=await fetch("/api/map");S.map=await r.json();S.mapVersion=S.map.version;
+  const geo=S.map.geometry;if(geo){S.geometryVersion=geo.version;if(S.geometryImageVersion!==geo.version){const image=new Image();image.onload=()=>{if(S.map.geometry&&S.map.geometry.version===geo.version){S.geometryImage=image;S.geometryImageVersion=geo.version;drawMap()}};image.src="data:image/png;base64,"+geo.image_png_base64}}else{S.geometryVersion=undefined;S.geometryImage=null;S.geometryImageVersion=undefined}
+  renderLegend();drawMap()}catch(e){}}
+$("heightSlice").onclick=async()=>{const result=await post("/api/geometry/filter",{z_min:Number($("zMin").value),z_max:Number($("zMax").value)});if(result&&result.ok)loadMap()};
+$("saveGeometry").onclick=async()=>{const result=await post("/api/geometry/export",{});if(result&&result.ok)toast("Saved: "+result.name)};
 function renderLegend(){const cats=new Set((S.map.nodes||[]).map(n=>n.category).filter(c=>c!=="room"));
+  const geo=S.map.geometry;$("mapTitle").textContent=geo?"Local LiDAR map":"Semantic map";
+  $("map").setAttribute("aria-label",geo?"Local LiDAR return projection":"Semantic map");
+  $("geometryTools").classList.toggle("hidden",!geo);
+  if(geo){$("mapMeta").textContent=`${geo.connected?"LIVE":"STALE"} · ${geo.return_cells.toLocaleString()} return cells`;
+    $("legend").textContent=`${geo.frame||"waiting"} · sensor units, unverified · Z ${geo.z_slice.join(" to ")} · ${geo.mode} · not SLAM`;
+    $("saveGeometry").disabled=!geo.connected;return}
   $("legend").innerHTML=[...cats].map(c=>`<span style="--c:${CAT[c]||"#888"}">${c}</span>`).join("")+`<span style="--c:var(--map-path)">planned path</span>`;
   $("mapMeta").textContent=`${(S.map.nodes||[]).filter(n=>n.category!=="room").length} objects · v${S.map.version}`}
 function mapFrame(cv){const m=S.map;let b=m.static?m.static.bounds:null;
@@ -299,6 +315,7 @@ function drawMap(){
   cv.width=W*dpr;cv.height=H*dpr;cv.style.height=H+"px";const g=cv.getContext("2d");g.setTransform(dpr,0,0,dpr,0,0);
   const css=getComputedStyle(document.documentElement),c=k=>css.getPropertyValue(k).trim();
   g.fillStyle=c("--panel");g.fillRect(0,0,W,H);if(!S.map)return;
+  if(S.map.geometry){drawGeometry(g,W,H,S.map.geometry);return}
   const f=mapFrame({width:W,height:H});S.frame=f;const st=S.map.static;
   if(st){g.font="600 12px system-ui";g.textAlign="center";
     for(const r of st.rooms){const [x1,y1,x2,y2]=r.bounds;g.fillStyle=c("--map-room");g.fillRect(f.X(x1),f.Y(y2),(x2-x1)*f.s,(y2-y1)*f.s);
@@ -322,7 +339,20 @@ function drawMap(){
   if(snap){const p=snap.telemetry.pose,x=f.X(p.x),y=f.Y(p.y),r=Math.max(9,0.3*f.s);
     g.save();g.translate(x,y);g.rotate(-p.yaw);g.fillStyle=c("--map-robot");g.beginPath();g.moveTo(r*1.4,0);g.lineTo(-r,-r*0.8);g.lineTo(-r*0.5,0);g.lineTo(-r,r*0.8);g.closePath();g.fill();
     g.globalAlpha=.15;g.beginPath();g.moveTo(0,0);g.arc(0,0,r*4,-Math.PI/4,Math.PI/4);g.closePath();g.fill();g.restore()}}
-$("map").addEventListener("click",e=>{if(!S.frame||!S.map)return;const b=e.target.getBoundingClientRect(),px=e.clientX-b.left,py=e.clientY-b.top;
+function drawGeometry(g,W,H,geo){
+  const pad=34,size=Math.min(W-2*pad,H-2*pad),ox=(W-size)/2,oy=(H-size)/2;
+  const [xmin,ymin,xmax,ymax]=geo.bounds,scale=size/(xmax-xmin);
+  const X=x=>ox+(x-xmin)*scale,Y=y=>oy+(ymax-y)*scale;
+  if(S.geometryImage&&S.geometryImageVersion===geo.version)g.drawImage(S.geometryImage,ox,oy,size,size);
+  g.strokeStyle="rgba(170,190,200,.2)";g.lineWidth=1;g.font="11px system-ui";g.fillStyle="#adbdc8";g.textAlign="center";
+  for(let v=Math.ceil(xmin/5)*5;v<=xmax;v+=5){g.beginPath();g.moveTo(X(v),oy);g.lineTo(X(v),oy+size);g.stroke();g.fillText(v,X(v),oy+size+17)}
+  for(let v=Math.ceil(ymin/5)*5;v<=ymax;v+=5){g.beginPath();g.moveTo(ox,Y(v));g.lineTo(ox+size,Y(v));g.stroke();g.fillText(v,ox-18,Y(v)+4)}
+  g.strokeStyle="#f4cf57";g.lineWidth=2;g.beginPath();g.moveTo(X(0)-6,Y(0));g.lineTo(X(0)+6,Y(0));g.moveTo(X(0),Y(0)-6);g.lineTo(X(0),Y(0)+6);g.stroke();
+  g.fillStyle="#f4cf57";g.textAlign="left";g.fillText("LiDAR",X(0)+8,Y(0)-8);
+  g.fillStyle="#adbdc8";g.textAlign="right";g.fillText("sensor X",ox+size,oy+size+30);g.textAlign="left";g.fillText("sensor Y",ox,oy-10);
+  if(!geo.connected){g.fillStyle="#ff9d80";g.textAlign="center";g.fillText("STALE / NO CURRENT CLOUD",W/2,18)}
+}
+$("map").addEventListener("click",e=>{if(!S.frame||!S.map||S.map.geometry)return;const b=e.target.getBoundingClientRect(),px=e.clientX-b.left,py=e.clientY-b.top;
   let best=null;for(const n of S.map.nodes){if(n.category==="room")continue;const d=Math.hypot(S.frame.X(n.coords[0])-px,S.frame.Y(n.coords[1])-py);if(d<14&&(!best||d<best[0]))best=[d,n]}
   if(best){S.selected=best[1].id;showNode(best[1])}else{S.selected=null;$("nodePanel").classList.remove("on");const [x,y]=S.frame.inv(px,py);$("cmd").value=`Go to ${x.toFixed(1)}, ${y.toFixed(1)}`;$("cmd").focus()}
   drawMap()});
@@ -366,7 +396,7 @@ function render(){
   $("telMeta").textContent=t.connected?(sim?"simulated":"SportModeState live"):"no state stream";
   $("anomalies").textContent=(s.sim_anomalies||[]).length?"Active: "+s.sim_anomalies.join(" · "):"No active anomalies";
   $("camMeta").textContent=s.detection_frame?`VLM overlay from frame #${s.detection_frame}`:"—";
-  if(s.map_version!==S.mapVersion&&!S.mapLoading){S.mapLoading=true;setTimeout(()=>{S.mapLoading=false;loadMap()},400)}
+  if((s.map_version!==S.mapVersion||s.sensors?.geometry?.version!==S.geometryVersion||s.sensors?.geometry?.connected!==S.map?.geometry?.connected)&&!S.mapLoading){S.mapLoading=true;setTimeout(()=>{S.mapLoading=false;loadMap()},400)}
   drawMap()}
 function addLog(e){const box=$("log"),div=document.createElement("div");div.className=e.level;
   const time=new Date(e.time*1000).toLocaleTimeString([], {hour12:false});

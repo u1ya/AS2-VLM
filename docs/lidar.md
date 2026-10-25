@@ -1,5 +1,9 @@
 # AS2 LiDAR: Read-Only Verification
 
+Update: real XYZ projection is now available in the live dashboard. See
+[Local Geometry](local_geometry.md) for the stationary window, filters and private
+snapshot export. This adds a sensor-frame density view, not global SLAM.
+
 Verified on the owner's AS2 EDU on 2026-10-25 over Ethernet, WSL2 Ubuntu-22.04
 mirrored, interface eth0, laptop 192.168.123.100/24, robot 192.168.123.161.
 Existing peer-scoped firewall permissions were unchanged. No movement, StopMove,

@@ -13,6 +13,7 @@ import time
 
 from .models import Pose, Telemetry
 from .robot_adapter import AdapterError, BaseRobotAdapter, CameraFrame
+from .lidar_geometry import LocalLidarGeometry, decode_xyz
 
 
 class ReadOnlySensorAdapter(BaseRobotAdapter):
@@ -34,6 +35,7 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
         self._frame_received = -math.inf
         self._frame_sequence = 0
         self._error = None
+        self.local_geometry = LocalLidarGeometry()
 
     @staticmethod
     def _linux_path(path):
@@ -103,6 +105,16 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
                     raise ValueError("Oversized sensor response")
                 snapshot = json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError("Nonfinite JSON")))
                 self._accept(snapshot)
+                lidar = snapshot["lidar"]
+                if "cloud_sequence" in lidar:
+                    try:
+                        with Path(str(self._image_path) + ".cloud").open("rb") as source:
+                            raw_cloud = source.read(16 * 1024 * 1024 + 9)
+                        xyz = decode_xyz(raw_cloud, lidar)
+                        if xyz is not None:
+                            self.local_geometry.ingest(xyz, lidar, snapshot["state"])
+                    except (OSError, ValueError) as exc:
+                        self.local_geometry.invalidate(str(exc))
                 self._ready.set()
                 camera = snapshot["camera"]
                 if camera.get("sequence", 0) > self._frame_sequence and camera["age_s"] < 3:
@@ -142,6 +154,7 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
             result["body_transform_verified"] = False
             result["scan_for_navigation"] = False
             result["error_message"] = self._error
+            result["geometry"] = self.local_geometry.status()
             return result
 
     def get_telemetry(self):

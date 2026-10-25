@@ -105,6 +105,10 @@ class AgentRuntime:
                 "edges": self.graph.get_edges(), "rooms": self.graph.rooms(), "sim_truth": self.adapter.sim_truth(),
                 "home_pose": self.config.home_pose}
 
+    def geometry_payload(self):
+        geometry = getattr(self.adapter, "local_geometry", None)
+        return geometry.payload() if geometry else None
+
     def public_config(self):
         cfg = self.config.to_dict()
         cfg["vlm"].pop("api_key_env", None)
@@ -153,7 +157,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/state":
             self._send(200, rt.snapshot())
         elif path == "/api/map":
-            self._send(200, rt.map_payload())
+            self._send(200, {**rt.map_payload(), "geometry": rt.geometry_payload()})
+        elif path == "/api/geometry":
+            self._send(200, rt.geometry_payload())
         elif path == "/api/config":
             self._send(200, rt.public_config())
         elif path == "/api/events":
@@ -216,7 +222,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": True})
                 return
             body = self._json_body()
-            if path == "/api/command":
+            if path in {"/api/geometry/export", "/api/geometry/filter"}:
+                geometry = getattr(rt.adapter, "local_geometry", None)
+                if geometry is None:
+                    raise ValueError("Real LiDAR geometry is not available in this mode")
+                if path.endswith("/filter"):
+                    geometry.set_slice(body.get("z_min"), body.get("z_max"))
+                    self._send(200, {"ok": True})
+                else:
+                    saved = geometry.export(rt.config.resolve_path("data/geometry"))
+                    self._send(200, {"ok": True, **saved})
+            elif path == "/api/command":
                 if getattr(rt.adapter, "read_only", False):
                     self._send(403, {"error": "Live sensor mode is read-only; use simulation for goals"})
                     return

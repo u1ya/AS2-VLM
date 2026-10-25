@@ -29,6 +29,10 @@ The versioned `configs/agent.as2-sensors.json` selects the actual setup:
 1920x1080 JPEG, `videohub`, cloud `rt/utlidar/cloud_livox_mid360`,
 frame `hesai_lidar`, about 10 Hz, with `robot.motion_enabled=false`.
 The camera worker requests about one frame per second; it is not a 30 FPS viewer.
+Real XYZ data now also drive a bounded stationary-window XY density layer in
+the live map panel, with a height filter and PNG/JSON/NPZ snapshot export. See
+[Local LiDAR Geometry](local_geometry.md). This does not supply navigation scans,
+SLAM, or semantic labels.
 The adapter discards stale images after 3 seconds and marks odometry/LiDAR stale
 after 1 second. `/api/lidar` exposes metadata, not an invented calibrated 2D scan.
 UI telemetry includes point count, cloud rate and sensor frame. Raw scans are not

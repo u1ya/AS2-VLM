@@ -32,13 +32,14 @@ int main(int argc, char** argv) {
     if (argc == 2 && std::string(argv[1]) == "--help") {
         std::cout << "Usage: as2_sensor_stream INTERFACE PRIVATE_FRAME_PATH.jpg\n"
                   << "Read-only JSON lines: odometry, lidar metadata and videohub JPEG.\n"
-                  << "Close stdin or send any input to quit. No sport client or writers.\n";
+                  << "Close stdin or send any input to quit. No sport client or motion publishers.\n";
         return 0;
     }
     if (argc != 3 || std::filesystem::exists(argv[2])) return 2;
     try {
         std::mutex mutex;
         JsonMap state, lidar;
+        sensor_msgs::msg::dds_::PointCloud2_ latest_cloud;
         double state_time = 0, lidar_time = 0, first_cloud = 0;
         unsigned cloud_count = 0;
         unitree::robot::ChannelFactory::Instance()->Init(0, argv[1]);
@@ -57,6 +58,7 @@ int main(int argc, char** argv) {
         }, 1);
         cloud.InitChannel([&](const void* raw) {
             const auto& msg = *static_cast<const sensor_msgs::msg::dds_::PointCloud2_*>(raw);
+            if (msg.data().size() > 16 * 1024 * 1024) return;
             std::lock_guard<std::mutex> lock(mutex);
             lidar_time = now_s();
             if (cloud_count++ == 0) first_cloud = lidar_time;
@@ -65,6 +67,7 @@ int main(int argc, char** argv) {
             lidar["bytes"] = double(msg.data().size());
             lidar["messages"] = int(cloud_count);
             lidar["hz"] = cloud_count > 1 ? (cloud_count - 1) / (lidar_time - first_cloud) : 0.0;
+            if (msg.data().size() <= 16 * 1024 * 1024) latest_cloud = msg;
         }, 1);
         health.InitChannel([&](const void* raw) {
             const auto& msg = *static_cast<const unitree_go::msg::dds_::LidarState_*>(raw);
@@ -75,6 +78,7 @@ int main(int argc, char** argv) {
         video.SetTimeout(1.0F); video.Init();
         std::this_thread::sleep_for(std::chrono::seconds(2));
         unsigned frame = 0;
+        unsigned written_cloud = 0;
         double frame_time = 0, next_camera = 0;
         int camera_code = -1;
         const auto deadline = now_s() + 8 * 3600;
@@ -96,14 +100,43 @@ int main(int argc, char** argv) {
                 next_camera = now_s() + 1.0;
             }
             JsonMap output;
+            sensor_msgs::msg::dds_::PointCloud2_ cloud_copy;
+            unsigned cloud_sequence = 0;
             {
                 std::lock_guard<std::mutex> lock(mutex);
                 auto state_copy = state, lidar_copy = lidar;
                 state_copy["age_s"] = state_time ? now_s() - state_time : -1.0;
                 lidar_copy["age_s"] = lidar_time ? now_s() - lidar_time : -1.0;
+                if (cloud_count != written_cloud) {
+                    cloud_copy = latest_cloud;
+                    cloud_sequence = cloud_count;
+                    lidar_copy["cloud_sequence"] = int(cloud_sequence);
+                    lidar_copy["width"] = double(cloud_copy.width());
+                    lidar_copy["height"] = double(cloud_copy.height());
+                    lidar_copy["point_step"] = int(cloud_copy.point_step());
+                    lidar_copy["row_step"] = double(cloud_copy.row_step());
+                    lidar_copy["bigendian"] = cloud_copy.is_bigendian();
+                    JsonArray fields;
+                    for (const auto& field : cloud_copy.fields()) {
+                        fields.emplace_back(JsonMap{{"name", field.name()}, {"offset", int(field.offset())},
+                            {"datatype", int(field.datatype())}, {"count", int(field.count())}});
+                    }
+                    lidar_copy["fields"] = fields;
+                }
                 output = {{"state", state_copy}, {"lidar", lidar_copy},
                           {"camera", JsonMap{{"sequence", int(frame)}, {"code", camera_code},
                             {"age_s", frame_time ? now_s() - frame_time : -1.0}}}};
+            }
+            if (cloud_sequence) {
+                const std::string path = std::string(argv[2]) + ".cloud";
+                std::ofstream file(path + ".tmp", std::ios::binary);
+                file.exceptions(std::ios::failbit | std::ios::badbit);
+                // Sequence header binds the atomically replaced binary to its JSON metadata.
+                for (int i = 0; i < 8; ++i) file.put(char((std::uint64_t(cloud_sequence) >> (8 * i)) & 0xff));
+                file.write(reinterpret_cast<const char*>(cloud_copy.data().data()), cloud_copy.data().size());
+                file.close();
+                std::filesystem::rename(path + ".tmp", path);
+                written_cloud = cloud_sequence;
             }
             std::cout << unitree::common::ToJsonString(output) << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
