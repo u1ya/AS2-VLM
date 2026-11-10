@@ -196,6 +196,15 @@ class TaskPlanner:
             raise PlanError("Goal must be 1-500 characters")
         goal = goal.strip()
         backend = backend or self.config.vlm.planner_backend
+        if self.config.relative_language_planner and backend == "ollama":
+            from .physical_planner import PhysicalPlanner
+            if not hasattr(self, "_relative_planner"):
+                self._relative_planner = PhysicalPlanner(self.config)
+            response = self._relative_planner.plan(goal)
+            if response.status != "ok":
+                raise PlanError(response.summary)
+            return self.check(TaskPlan(goal=goal, summary=response.summary, planner="ollama",
+                steps=[PlanStep.model_validate(step.model_dump()) for step in response.steps]))
         clauses = [c.strip() for c in CLAUSE_SPLIT.split(goal.lower()) if c and c.strip()]
         primitives = [primitive_step(c) for c in clauses]
         if primitives and all(primitives):

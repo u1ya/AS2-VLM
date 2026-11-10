@@ -1,0 +1,889 @@
+{
+  "executed": false,
+  "mode": "hybrid",
+  "model": "qwen2.5vl:3b",
+  "cases": [
+    {
+      "text": "Оглянись вокруг",
+      "expected": {
+        "text": "Оглянись вокруг",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Оглянись",
+      "expected": {
+        "text": "Оглянись",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Осмотрись вокруг",
+      "expected": {
+        "text": "Осмотрись вокруг",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Посмотри вокруг",
+      "expected": {
+        "text": "Посмотри вокруг",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Look around",
+      "expected": {
+        "text": "Look around",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Please look around!",
+      "expected": {
+        "text": "Please look around!",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Look around clockwise",
+      "expected": {
+        "text": "Look around clockwise",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Оглянись вокруг направо",
+      "expected": {
+        "text": "Оглянись вокруг направо",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Оглянись вокруг против часовой стрелки",
+      "expected": {
+        "text": "Оглянись вокруг против часовой стрелки",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Развернись",
+      "expected": {
+        "text": "Развернись",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            180
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 3.141592653589793,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Turn around",
+      "expected": {
+        "text": "Turn around",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            180
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 3.141592653589793,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Развернись вправо",
+      "expected": {
+        "text": "Развернись вправо",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -180
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -3.141592653589793,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Turn around to the right",
+      "expected": {
+        "text": "Turn around to the right",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -180
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -3.141592653589793,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Повернись налево",
+      "expected": {
+        "text": "Повернись налево",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            90
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 1.5707963267948966,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Turn right",
+      "expected": {
+        "text": "Turn right",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -90
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -1.5707963267948966,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Повернись на 45 градусов направо и пройди 1 метр",
+      "expected": {
+        "text": "Повернись на 45 градусов направо и пройди 1 метр",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -45
+          ],
+          [
+            "walk_relative",
+            1
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -0.7853981633974483,
+            "reasoning": "Recognized complete operator command"
+          },
+          {
+            "tool": "walk_relative",
+            "distance_m": 1.0,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Пройди вперед на метр и остановись",
+      "expected": {
+        "text": "Пройди вперед на метр и остановись",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            1
+          ],
+          [
+            "stop",
+            0
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": 1.0,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          },
+          {
+            "tool": "stop",
+            "distance_m": null,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Отступи на полметра, затем повернись налево",
+      "expected": {
+        "text": "Отступи на полметра, затем повернись налево",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            -0.5
+          ],
+          [
+            "rotate_relative",
+            90
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": -0.5,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          },
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 1.5707963267948966,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Пройди вперед полтора метра",
+      "expected": {
+        "text": "Пройди вперед полтора метра",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            1.5
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": 1.5,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Walk forward 0.5 meters then turn right 45 degrees",
+      "expected": {
+        "text": "Walk forward 0.5 meters then turn right 45 degrees",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            0.5
+          ],
+          [
+            "rotate_relative",
+            -45
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": 0.5,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          },
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -0.7853981633974483,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Back up half a metre",
+      "expected": {
+        "text": "Back up half a metre",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            -0.5
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": -0.5,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Пройди назад 0,5 метра",
+      "expected": {
+        "text": "Пройди назад 0,5 метра",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            -0.5
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": -0.5,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Повернись на 1.5707963267948966 rad",
+      "expected": {
+        "text": "Повернись на 1.5707963267948966 rad",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            90
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 1.5707963267948966,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Стоп",
+      "expected": {
+        "text": "Стоп",
+        "status": "ok",
+        "steps": [
+          [
+            "stop",
+            0
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "stop",
+            "distance_m": null,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Stop",
+      "expected": {
+        "text": "Stop",
+        "status": "ok",
+        "steps": [
+          [
+            "stop",
+            0
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "stop",
+            "distance_m": null,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Не оглядывайся вокруг",
+      "expected": {
+        "text": "Не оглядывайся вокруг",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Укажите прямую команду движения без отрицаний, условий и цитат.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Don't turn around",
+      "expected": {
+        "text": "Don't turn around",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Please give a direct movement command without negations, conditions or quotations.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Скажи «оглянись вокруг»",
+      "expected": {
+        "text": "Скажи «оглянись вокруг»",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Укажите прямую команду движения без отрицаний, условий и цитат.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Say look around",
+      "expected": {
+        "text": "Say look around",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Please give a direct movement command without negations, conditions or quotations.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Если дверь открыта, развернись",
+      "expected": {
+        "text": "Если дверь открыта, развернись",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Укажите прямую команду движения без отрицаний, условий и цитат.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "If the door opens, turn around",
+      "expected": {
+        "text": "If the door opens, turn around",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Please give a direct movement command without negations, conditions or quotations.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Пройди немного вперед",
+      "expected": {
+        "text": "Пройди немного вперед",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Уточните расстояние в метрах либо угол и одно направление поворота.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Move forward a little",
+      "expected": {
+        "text": "Move forward a little",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Specify the distance in metres, or the angle and one turn direction.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Пройди вперед",
+      "expected": {
+        "text": "Пройди вперед",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Уточните расстояние в метрах либо угол и одно направление поворота.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Turn",
+      "expected": {
+        "text": "Turn",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Specify the distance in metres, or the angle and one turn direction.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Turn left 90 degrees right",
+      "expected": {
+        "text": "Turn left 90 degrees right",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Specify the distance in metres, or the angle and one turn direction.",
+        "steps": []
+      },
+      "seconds": 0.0
+    }
+  ],
+  "passed": 36,
+  "total": 36
+}

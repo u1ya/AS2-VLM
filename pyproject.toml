@@ -18,4 +18,4 @@ robot = ["unitree_sdk2py", "opencv-python>=4.8"]
 include = ["as2_vlm*"]
 
 [tool.setuptools.package-data]
-"as2_vlm.agent" = ["static/*.html"]
+"as2_vlm.agent" = ["static/*.html", "language_cases/*.json"]

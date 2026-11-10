@@ -5,6 +5,8 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <poll.h>
+#include <unistd.h>
 
 #include <unitree/robot/as2/sport/sport_client.hpp>
 #include <unitree/robot/channel/channel_subscriber.hpp>
@@ -12,12 +14,25 @@
 
 #include "forward_pulse_policy.hpp"
 #include "meter_policy.hpp"
+#include "ui_heartbeat.hpp"
 
 namespace {
 volatile std::sig_atomic_t cancelled = 0;
 void cancel(int) { cancelled = 1; }
 double now_seconds() {
     return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+bool ui_input(as2_test::UiHeartbeat& heartbeat) {
+    pollfd fd{STDIN_FILENO, POLLIN | POLLHUP, 0};
+    while (poll(&fd, 1, 0) > 0) {
+        char bytes[512];
+        const auto count = read(STDIN_FILENO, bytes, sizeof(bytes));
+        if (count <= 0 || !heartbeat.feed(std::string(bytes, static_cast<std::size_t>(count)), now_seconds())) {
+            cancelled = 1; return heartbeat.stop();
+        }
+    }
+    return !cancelled;
 }
 
 class Odometry {
@@ -79,15 +94,21 @@ int main(int argc, char** argv) {
                   << "--observe reads odometry only. --execute requires typing METER.\n"
                   << "Target: 1 m by odometry (2 cm tolerance); speed cap 0.15 m/s; 12 s limit.\n"
                   << "No obstacle detection or hardware watchdog. Independent operator stop required.\n";
+        std::cout << "Internal --execute-ui additionally requires KEEPALIVE; STOP/EOF/0.8 s heartbeat loss cancels.\n";
         return 0;
     }
-    if (argc != 3 || (std::string(argv[2]) != "--observe" && std::string(argv[2]) != "--execute")) return 2;
+    if (argc != 3 || (std::string(argv[2]) != "--observe" && std::string(argv[2]) != "--execute" && std::string(argv[2]) != "--execute-ui")) return 2;
     const bool observe = std::string(argv[2]) == "--observe";
+    const bool ui = std::string(argv[2]) == "--execute-ui";
     if (!observe) {
         std::cout << "PHYSICAL 1 METER TEST. Clear level floor, cable slack, independent remote stop.\n"
                   << "Type METER only when ready; any other input cancels: " << std::flush;
         std::string confirmation;
-        if (!std::getline(std::cin, confirmation) || confirmation != "METER") {
+        if (ui) {
+            char ch;
+            while (confirmation.size() < 16 && read(STDIN_FILENO, &ch, 1) == 1 && ch != '\n') confirmation += ch;
+        } else std::getline(std::cin, confirmation);
+        if (confirmation != "METER") {
             std::cout << "Cancelled; no robot command sent.\n";
             return 2;
         }
@@ -117,9 +138,24 @@ int main(int argc, char** argv) {
         as2_test::StopGuard<unitree::robot::as2::SportClient> guard(client);
         const auto origin = odometry.snapshot();
         as2_test::MeterPolicy policy(origin, now_seconds());
+        as2_test::UiHeartbeat heartbeat;
+        if (ui) {
+            // Heartbeats are requested only after startup, so old startup messages cannot arm walking.
+            std::cout << "UI_READY" << std::endl;
+            const auto until = now_seconds() + 1.0;
+            while (!cancelled && !heartbeat.ready() && now_seconds() < until) {
+                ui_input(heartbeat);
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            if (!heartbeat.ready()) cancelled = 1;
+        }
         bool reached = false;
         double last_log = 0;
         while (!cancelled) {
+            if (ui && (!ui_input(heartbeat) || !heartbeat.alive(now_seconds()))) {
+                std::cout << "Result=ui_heartbeat_lost" << std::endl;
+                break;
+            }
             const auto current = odometry.snapshot();
             const double now = now_seconds();
             const auto decision = policy.update(current, now);

@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "sensor_model": null,
+  "hardware_binding": null,
+  "lidar_length_unit": null,
+  "imu_acceleration_unit": null,
+  "imu_angular_velocity_unit": null,
+  "point_time_unit": null,
+  "point_time_reference": null,
+  "imu_time_minus_lidar_time_s": null,
+  "T_imu_from_lidar": null,
+  "provenance": null
+}

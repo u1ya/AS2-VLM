@@ -173,9 +173,10 @@ def answer_from_state(question, state):
 class VLMPerception:
     """Real VLM perception over any transport with chat_json(system, user, image_b64, schema, num_predict)."""
 
-    def __init__(self, chat, name):
+    def __init__(self, chat, name, detection_prompt=DETECT_PROMPT):
         self.chat = chat
         self.name = name
+        self.detection_prompt = detection_prompt
 
     def _image(self, frame):
         if frame is None or not frame.jpeg:
@@ -191,7 +192,7 @@ class VLMPerception:
             raise VLMError(f"Model output failed validation: {exc.errors()[0]['msg']}") from exc
 
     def detect_objects(self, frame):
-        answer = self.chat.chat_json(DETECT_PROMPT, json.dumps({"image_width": frame.width, "image_height": frame.height}),
+        answer = self.chat.chat_json(self.detection_prompt, json.dumps({"image_width": frame.width, "image_height": frame.height}),
                                      self._image(frame), schema=llm_schema(RawDetections), num_predict=1200)
         if not isinstance(answer, dict) or not isinstance(answer.get("objects"), list):
             raise VLMError("Detection output has no objects list")

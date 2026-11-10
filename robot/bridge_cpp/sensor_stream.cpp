@@ -14,11 +14,29 @@
 #include <unitree/idl/go2/SportModeState_.hpp>
 #include <unitree/idl/go2/LidarState_.hpp>
 #include <unitree/idl/ros2/PointCloud2_.hpp>
+#include <unitree/idl/ros2/Imu_.hpp>
+#include "shared_recording.hpp"
 
 using unitree::common::JsonMap;
 using unitree::common::JsonArray;
 double now_s() {
     return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+template <typename Header> JsonMap timing(const Header& header) {
+    return {{"host_monotonic_ns", std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count())}, {"frame", header.frame_id()},
+        {"stamp_sec", header.stamp().sec()}, {"stamp_nanosec", int(header.stamp().nanosec())}};
+}
+JsonMap cloud_metadata(const sensor_msgs::msg::dds_::PointCloud2_& cloud) {
+    auto meta = timing(cloud.header());
+    meta["width"] = double(cloud.width()); meta["height"] = double(cloud.height());
+    meta["point_step"] = int(cloud.point_step()); meta["row_step"] = double(cloud.row_step());
+    meta["bigendian"] = cloud.is_bigendian();
+    JsonArray fields;
+    for (const auto& f : cloud.fields()) fields.emplace_back(JsonMap{{"name", f.name()},
+        {"offset", int(f.offset())}, {"datatype", int(f.datatype())}, {"count", int(f.count())}});
+    meta["fields"] = fields;
+    return meta;
 }
 template <typename Values> JsonArray numbers(const Values& values) {
     JsonArray result;
@@ -32,11 +50,14 @@ int main(int argc, char** argv) {
     if (argc == 2 && std::string(argv[1]) == "--help") {
         std::cout << "Usage: as2_sensor_stream INTERFACE PRIVATE_FRAME_PATH.jpg\n"
                   << "Read-only JSON lines: odometry, lidar metadata and videohub JPEG.\n"
-                  << "Close stdin or send any input to quit. No sport client or motion publishers.\n";
+                  << "Q or stdin EOF quits; RECORD<TAB>SECONDS<TAB>NEW_DIRECTORY records shared callbacks.\n"
+                  << "No sport client or motion publishers.\n";
         return 0;
     }
     if (argc != 3 || std::filesystem::exists(argv[2])) return 2;
     try {
+        SharedRecording recording;
+        std::string recording_error;
         std::mutex mutex;
         JsonMap state, lidar;
         sensor_msgs::msg::dds_::PointCloud2_ latest_cloud;
@@ -46,19 +67,28 @@ int main(int argc, char** argv) {
         unitree::robot::ChannelSubscriber<unitree_go::msg::dds_::SportModeState_> odom("rt/lf/sportmodestate");
         unitree::robot::ChannelSubscriber<sensor_msgs::msg::dds_::PointCloud2_> cloud("rt/utlidar/cloud_livox_mid360");
         unitree::robot::ChannelSubscriber<unitree_go::msg::dds_::LidarState_> health("rt/utlidar/lidar_state");
+        unitree::robot::ChannelSubscriber<sensor_msgs::msg::dds_::Imu_> imu("rt/utlidar/imu_livox_mid360");
         odom.InitChannel([&](const void* raw) {
             const auto& msg = *static_cast<const unitree_go::msg::dds_::SportModeState_*>(raw);
             try {
                 JsonMap next{{"position", numbers(msg.position())}, {"velocity", numbers(msg.velocity())},
                              {"rpy", numbers(msg.imu_state().rpy())}, {"mode", int(msg.mode())},
                              {"error", std::to_string(msg.error_code())}};
+                if (recording.active()) {
+                    auto row = next;
+                    row["stamp_sec"] = msg.stamp().sec(); row["stamp_nanosec"] = int(msg.stamp().nanosec());
+                    row["host_monotonic_ns"] = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch()).count());
+                    recording.row(std::move(row), false);
+                }
                 std::lock_guard<std::mutex> lock(mutex);
                 state = std::move(next); state_time = now_s();
             } catch (const std::exception&) {}
-        }, 1);
+        }, 64);
         cloud.InitChannel([&](const void* raw) {
             const auto& msg = *static_cast<const sensor_msgs::msg::dds_::PointCloud2_*>(raw);
             if (msg.data().size() > 16 * 1024 * 1024) return;
+            if (recording.active()) recording.cloud(msg, cloud_metadata(msg));
             std::lock_guard<std::mutex> lock(mutex);
             lidar_time = now_s();
             if (cloud_count++ == 0) first_cloud = lidar_time;
@@ -68,7 +98,21 @@ int main(int argc, char** argv) {
             lidar["messages"] = int(cloud_count);
             lidar["hz"] = cloud_count > 1 ? (cloud_count - 1) / (lidar_time - first_cloud) : 0.0;
             if (msg.data().size() <= 16 * 1024 * 1024) latest_cloud = msg;
-        }, 1);
+        }, 16);
+        imu.InitChannel([&](const void* raw) {
+            if (!recording.active()) return;
+            try {
+                const auto& msg = *static_cast<const sensor_msgs::msg::dds_::Imu_*>(raw);
+                auto row = timing(msg.header());
+                const auto& a = msg.linear_acceleration(); const auto& g = msg.angular_velocity();
+                const auto& q = msg.orientation();
+                row["linear_acceleration"] = numbers(std::array<double, 3>{a.x(), a.y(), a.z()});
+                row["angular_velocity"] = numbers(std::array<double, 3>{g.x(), g.y(), g.z()});
+                row["orientation_xyzw"] = numbers(std::array<double, 4>{q.x(), q.y(), q.z(), q.w()});
+                row["orientation_covariance"] = numbers(msg.orientation_covariance());
+                recording.row(std::move(row), true);
+            } catch (const std::exception&) {}
+        }, 256);
         health.InitChannel([&](const void* raw) {
             const auto& msg = *static_cast<const unitree_go::msg::dds_::LidarState_*>(raw);
             std::lock_guard<std::mutex> lock(mutex);
@@ -84,7 +128,20 @@ int main(int argc, char** argv) {
         const auto deadline = now_s() + 8 * 3600;
         while (now_s() < deadline) {
             pollfd input{STDIN_FILENO, POLLIN | POLLHUP, 0};
-            if (poll(&input, 1, 0) > 0) break;
+            if (poll(&input, 1, 0) > 0) {
+                std::string command;
+                if (!std::getline(std::cin, command) || command == "Q") break;
+                try {
+                    const auto tab = command.find('\t', 7);
+                    if (command.rfind("RECORD\t", 0) != 0 || tab == std::string::npos || command.size() > 4096)
+                        throw std::runtime_error("Invalid recording command");
+                    const auto duration = command.substr(7, tab - 7);
+                    if (duration.empty() || duration.size() > 2 || duration.find_first_not_of("0123456789") != std::string::npos)
+                        throw std::runtime_error("Invalid duration");
+                    recording.start(command.substr(tab+1), std::stoi(duration));
+                    recording_error.clear();
+                } catch (const std::exception& e) { recording_error = e.what(); }
+            }
             if (now_s() >= next_camera) {
                 std::vector<uint8_t> bytes;
                 camera_code = video.GetImageSample(bytes);
@@ -138,10 +195,13 @@ int main(int argc, char** argv) {
                 std::filesystem::rename(path + ".tmp", path);
                 written_cloud = cloud_sequence;
             }
+            auto status = recording.status();
+            status["command_error"] = recording_error;
+            output["recording"] = status;
             std::cout << unitree::common::ToJsonString(output) << std::endl;
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
-        odom.CloseChannel(); cloud.CloseChannel(); health.CloseChannel();
+        odom.CloseChannel(); cloud.CloseChannel(); health.CloseChannel(); imu.CloseChannel();
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Sensor stream failed: " << error.what() << '\n'; return 1;

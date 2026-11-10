@@ -1,0 +1,12 @@
+[
+  {"text":"Сделай полный оборот на месте","status":"ok","steps":[["rotate_relative",360]]},
+  {"text":"Survey your surroundings by turning all the way round to the right","status":"ok","steps":[["rotate_relative",-360]]},
+  {"text":"Повернись в обратную сторону через левый бок","status":"ok","steps":[["rotate_relative",180]]},
+  {"text":"Face the opposite direction with a clockwise half turn","status":"ok","steps":[["rotate_relative",-180]]},
+  {"text":"Сдай назад на пятьдесят сантиметров","status":"ok","steps":[["walk_relative",-0.5]]},
+  {"text":"Advance fifty centimetres, then rotate thirty degrees clockwise","status":"ok","steps":[["walk_relative",0.5],["rotate_relative",-30]]},
+  {"text":"Пройди вперед один метр, после этого повернись вправо на тридцать градусов","status":"ok","steps":[["walk_relative",1],["rotate_relative",-30]]},
+  {"text":"Оглянись вокург","status":"ok","steps":[["rotate_relative",360]]},
+  {"text":"Approach the nearest window","status":"unsupported","steps":[]},
+  {"text":"Пожалуйста, пройди чуть вперед","status":"clarify","steps":[]}
+]

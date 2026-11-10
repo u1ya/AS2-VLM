@@ -1,0 +1,275 @@
+{
+  "executed": false,
+  "mode": "hybrid",
+  "model": "qwen2.5vl:3b",
+  "cases": [
+    {
+      "text": "Сделай полный оборот на месте",
+      "expected": {
+        "text": "Сделай полный оборот на месте",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Survey your surroundings by turning all the way round to the right",
+      "expected": {
+        "text": "Survey your surroundings by turning all the way round to the right",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Повернуться на месте на 360 градусов вправо.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -6.283185307179586,
+            "reasoning": "Полный обзор вокруг"
+          }
+        ]
+      },
+      "seconds": 0.703
+    },
+    {
+      "text": "Повернись в обратную сторону через левый бок",
+      "expected": {
+        "text": "Повернись в обратную сторону через левый бок",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            180
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 3.141592653589793,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Face the opposite direction with a clockwise half turn",
+      "expected": {
+        "text": "Face the opposite direction with a clockwise half turn",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -180
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Execute the requested commands in order.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -3.141592653589793,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Сдай назад на пятьдесят сантиметров",
+      "expected": {
+        "text": "Сдай назад на пятьдесят сантиметров",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            -0.5
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Выполнить команды по порядку.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": -0.5,
+            "angle_rad": null,
+            "reasoning": "Recognized complete operator command"
+          }
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Advance fifty centimetres, then rotate thirty degrees clockwise",
+      "expected": {
+        "text": "Advance fifty centimetres, then rotate thirty degrees clockwise",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            0.5
+          ],
+          [
+            "rotate_relative",
+            -30
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Пройти 0.5 м, затем повернуться на 30 градусов вправо.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": 0.5,
+            "angle_rad": null,
+            "reasoning": "Полуметра означает 0.5 метра"
+          },
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -0.5235987755982988,
+            "reasoning": "Полуметра означает 0.5 метра"
+          }
+        ]
+      },
+      "seconds": 0.797
+    },
+    {
+      "text": "Пройди вперед один метр, после этого повернись вправо на тридцать градусов",
+      "expected": {
+        "text": "Пройди вперед один метр, после этого повернись вправо на тридцать градусов",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            1
+          ],
+          [
+            "rotate_relative",
+            -30
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Пройти вперед 1 метр, затем повернуться вправо на 30 градусов.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": 1.0,
+            "angle_rad": null,
+            "reasoning": "Пройти вперед 1 метр"
+          },
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -0.5235987755982988,
+            "reasoning": "Поворот вправо на 30 градусов"
+          }
+        ]
+      },
+      "seconds": 0.75
+    },
+    {
+      "text": "Оглянись вокург",
+      "expected": {
+        "text": "Оглянись вокург",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Повернуться на месте на 360 градусов влево.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Полный обзор вокруг"
+          }
+        ]
+      },
+      "seconds": 0.469
+    },
+    {
+      "text": "Approach the nearest window",
+      "expected": {
+        "text": "Approach the nearest window",
+        "status": "unsupported",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "unsupported",
+        "summary": "Navigation to objects and rooms is unavailable for this executor.",
+        "steps": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "text": "Пожалуйста, пройди чуть вперед",
+      "expected": {
+        "text": "Пожалуйста, пройди чуть вперед",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Уточните расстояние в метрах либо угол и одно направление поворота.",
+        "steps": []
+      },
+      "seconds": 0.0
+    }
+  ],
+  "passed": 10,
+  "total": 10
+}

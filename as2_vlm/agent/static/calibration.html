@@ -1,0 +1,25 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AS2 · Калибровка камеры</title>
+<style>:root{color-scheme:dark;font-family:system-ui;background:#10171f;color:#e7eef5}body{max-width:1100px;margin:auto;padding:24px}h1{font-size:25px}p,li{line-height:1.6;color:#b8c8d8}.box{background:#19232e;border:1px solid #35485a;border-radius:12px;padding:20px;margin:18px 0}img{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#080d12}button{padding:12px 18px;background:#27765c;border:0;border-radius:7px;color:white;font-size:15px;margin:8px 12px 0 0}button:disabled{opacity:.4}#message{color:#f3ce76}a{color:#8bd6bf}</style>
+<h1 id="pageTitle">Калибровка камеры AS2</h1><p>Робот остаётся неподвижным. Перемещайте только мишень.</p>
+<div class="box"><ol><li>Используйте плоскую шахматную мишень с 9 × 6 внутренними углами. Измеренный размер клетки этой сессии: <strong id="squareSize">…</strong>. Не меняйте масштаб рисунка между кадрами.</li><li>Покажите всю мишень камере. Соберите 15–20 кадров: слева, справа, сверху, снизу; близко и дальше; с наклоном в разные стороны. Во время сохранения держите мишень неподвижно.</li><li>Когда углы выделены цветными линиями, нажмите «Сохранить ракурс». После каждого сохранения измените положение мишени.</li></ol><p>Этот этап определяет параметры камеры. Для совмещения с LiDAR и защиты от столкновений затем нужны отдельные измерения.</p><p id="coverage" role="status"></p><p id="lidarPair"></p></div>
+<div class="box"><p id="targetDimensions"></p><img id="camera" alt="Камера с найденными углами шахматной мишени"><p id="status">Подключение…</p><button id="capture" disabled>Сохранить ракурс</button><button id="solve" disabled>Рассчитать параметры камеры</button><p id="message" role="status"></p><p id="result"></p></div>
+<script>
+const $=id=>document.getElementById(id);let busy=false;
+async function post(path){if(busy)return;busy=true;try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}),s=await r.json();if(!r.ok)throw Error(s.error);$('message').textContent=path.endsWith('capture')?'Ракурс сохранён. Измените положение мишени.':'Параметры камеры сохранены; предстоит проверка LiDAR-привязки.'}catch(e){$('message').textContent=e.message}finally{busy=false;poll(false)}}
+async function poll(repeat=true){try{
+ const r=await fetch('/api/status');if(!r.ok)throw Error('Сервис недоступен');const s=await r.json(),paired=s.stage==='camera_lidar';
+ $('pageTitle').textContent=paired?'Привязка камеры к LiDAR · сбор пар':'Калибровка камеры AS2';
+ $('squareSize').textContent=`${s.square_mm??25} мм`;
+ $('targetDimensions').textContent=s.target_dimensions_cm?`Вся плоская сторона: ${s.target_dimensions_cm[0]} × ${s.target_dimensions_cm[1]} см. Бумага занимает её часть; клетка ${s.square_mm} мм.`:'';
+ $('coverage').textContent=paired?(s.pose_quality?.hint||'Соберите 12–15 положений плоской стороны щита с разными наклонами. Перед сохранением держите его неподвижно 2 секунды.'):(s.coverage_issues||[]).join('. ');
+ $('lidarPair').textContent=`Снимков с облаком LiDAR: ${s.paired_views??0}. `+(s.lidar_pair_available?'Для текущего кадра облако доступно.':paired?'Дождитесь подходящего облака LiDAR — без него пара не сохраняется.':'Для текущего кадра облако недоступно; сохранится только изображение камеры.');
+ $('status').textContent=`${s.board_found?'Мишень найдена':'Покажите всю мишень камере'} · ракурсов ${s.views} / минимум ${s.minimum_views}`;
+ $('capture').textContent=paired?'Сохранить пару':'Сохранить ракурс';
+ $('capture').disabled=busy||!s.board_found||!!s.error||paired&&!s.lidar_pair_available;
+ $('solve').hidden=paired;$('solve').disabled=busy||s.views<s.minimum_views;
+ $('result').textContent=paired?'Используются сохранённые параметры камеры. Привязка к LiDAR ещё не рассчитана.':s.result?`Предыдущий расчёт: ошибка ${s.result.training_rms_px.toFixed(2)} пикселя; контроль: ${s.result.holdout_rms_px.map(v=>v.toFixed(2)).join(', ')}. `+(s.result.quality_checks_passed?'Численные проверки пройдены; внешняя калибровка ещё не выполнена.':'Нужен повторный расчёт с проверкой покрытия и устойчивости.'):'';
+ if(s.error)$('status').textContent+=' · '+s.error;if(repeat)$('camera').src='/camera.jpg?t='+Date.now();
+ }catch(e){$('status').textContent=e.message;$('capture').disabled=true;$('solve').disabled=true}if(repeat)setTimeout(poll,1200)}
+$('capture').onclick=()=>post('/api/capture');$('solve').onclick=()=>post('/api/solve');poll();
+</script></html>

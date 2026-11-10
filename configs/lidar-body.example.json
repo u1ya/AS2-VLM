@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "lidar_frame": "hesai_lidar",
+  "length_unit": null,
+  "T_body_from_lidar": null,
+  "floor_z_m": null,
+  "half_length_m": null,
+  "half_width_m": null,
+  "clearance_m": 0.6,
+  "evidence": null
+}

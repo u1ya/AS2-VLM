@@ -40,6 +40,7 @@ class AgentRuntime:
         self.log = EventLog()
         self._lock = threading.RLock()
         self.adapter = self.graph = self.engine = None
+        self.manual = None
         self._build(config.simulation_mode)
 
     def _build(self, simulation):
@@ -48,7 +49,11 @@ class AgentRuntime:
         if simulation:
             adapter = MockAs2Adapter(cfg, clock)
         elif cfg.robot.transport == "cpp_readonly":
-            adapter = ReadOnlySensorAdapter(cfg, clock)
+            if cfg.robot.sensor_hub_url:
+                from .shared_sensor_adapter import SharedSensorAdapter
+                adapter = SharedSensorAdapter(cfg, clock)
+            else:
+                adapter = ReadOnlySensorAdapter(cfg, clock)
         else:
             adapter = RealUnitreeAs2Adapter(cfg, clock)
         adapter.on_speech = lambda text: self.log.emit("speech", text, data={"text": text})
@@ -63,15 +68,26 @@ class AgentRuntime:
             planner = TaskPlanner(graph, navigator, cfg)
             engine = ExecutionEngine(cfg, adapter, graph, planner, perception, navigator, self.log)
             engine.start()
+            manual = None
+            if cfg.manual_control and not simulation:
+                from .manual_control import ManualControl
+                manual = ManualControl(cfg, adapter)
+                manual.reserve()
         except Exception:
+            if 'engine' in locals():
+                engine.shutdown()
             adapter.close()
             raise
         self.adapter, self.graph, self.engine = adapter, graph, engine
+        self.manual = manual
         mode = "MOCK SIMULATION" if simulation else "LIVE AS2 EDU"
         self.log.emit("system", f"{mode} ready: perception={perception.name}, planner={cfg.vlm.planner_backend}, "
                                 f"motion_enabled={adapter.motion_enabled}, armed={adapter.armed}")
 
     def _teardown(self):
+        if self.manual:
+            self.manual.close()
+            self.manual = None
         self.engine.shutdown()
         self.adapter.close()
         self.graph.close()
@@ -80,7 +96,7 @@ class AgentRuntime:
         with self._lock:
             if (self.adapter.kind == "mock") == simulation:
                 return {"ok": True}
-            if self.engine.is_busy():
+            if self.engine.is_busy() or (self.manual and self.manual.status()["busy"]):
                 return {"ok": False, "reason": "Stop or finish the current task before switching mode"}
             previous = self.adapter.kind == "mock"
             self._teardown()
@@ -97,7 +113,7 @@ class AgentRuntime:
             self._teardown()
 
     def snapshot(self):
-        return self.engine.snapshot()
+        return {**self.engine.snapshot(), "manual_control": self.manual.status() if self.manual else {"enabled": False}}
 
     def map_payload(self):
         nodes = [n.model_dump() for n in self.graph.get_all_nodes()]
@@ -211,6 +227,15 @@ class Handler(BaseHTTPRequestHandler):
         rt = self.runtime
         path = self.path.split("?", 1)[0]
         if not self._same_origin():
+            # Drain only a bounded body before closing HTTP/1.0; otherwise Windows
+            # can reset the socket before the browser receives the rejection.
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if 0 < size <= MAX_JSON_BYTES:
+                    self.connection.settimeout(1)
+                    self.rfile.read(size)
+            except (ValueError, OSError):
+                pass
             self._send(403, {"error": "Origin rejected"})
             return
         try:
@@ -222,7 +247,37 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": True})
                 return
             body = self._json_body()
-            if path in {"/api/geometry/export", "/api/geometry/filter"}:
+            if path in {"/api/manual/start", "/api/manual/heartbeat", "/api/manual/stop", "/api/manual/parse", "/api/manual/text", "/api/manual/plan", "/api/manual/execute-plan"}:
+                expected_host = "127.0.0.1:" + str(self.server.server_port)
+                if self.headers.get("Host") != expected_host or self.headers.get("Origin") != "http://" + expected_host or self.headers.get_content_type() != "application/json":
+                    self._send(403, {"error": "Manual control requires same-origin loopback JSON"})
+                    return
+                manual = getattr(rt, "manual", None)
+                if manual is None:
+                    self._send(403, {"error": "Manual control not enabled on this panel"})
+                    return
+                if path.endswith("/plan"):
+                    self._send(200, manual.prepare_plan(body))
+                elif path.endswith("/execute-plan"):
+                    self._send(202, manual.execute_plan(body))
+                elif path.endswith("/parse"):
+                    if set(body) != {"text"}:
+                        raise ValueError("Expected text only")
+                    from .manual_control import parse_manual_text
+                    self._send(200, parse_manual_text(body["text"]))
+                elif path.endswith("/text"):
+                    self._send(202, manual.text(body))
+                elif path.endswith("/start"):
+                    self._send(202, manual.start(body))
+                elif path.endswith("/heartbeat"):
+                    if set(body) != {"lease"}:
+                        raise ValueError("Expected session lease")
+                    self._send(200, manual.heartbeat(body["lease"]))
+                else:
+                    if body:
+                        raise ValueError("Stop does not accept parameters")
+                    self._send(202, manual.stop())
+            elif path in {"/api/geometry/export", "/api/geometry/filter"}:
                 geometry = getattr(rt.adapter, "local_geometry", None)
                 if geometry is None:
                     raise ValueError("Real LiDAR geometry is not available in this mode")
@@ -270,7 +325,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": True})
             else:
                 self._send(404, {"error": "Not found"})
-        except (ValueError, KeyError, TypeError, PlanError, AdapterError, json.JSONDecodeError) as exc:
+        except (ValueError, KeyError, TypeError, PlanError, VLMError, AdapterError, json.JSONDecodeError) as exc:
             self._send(400, {"error": str(exc)})
         except TimeoutError:
             self._send(504, {"error": "Engine did not respond in time"})
@@ -289,10 +344,16 @@ def main(argv=None):
     parser.add_argument("--planner", choices=["rules", "ollama", "openai_compatible"])
     parser.add_argument("--fresh-map", action="store_true", help="discard the stored semantic map before start")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--manual-control", action="store_true", help="enable bounded physical forward test and network stop on loopback; independent remote stop required")
+    parser.add_argument("--relative-language", action="store_true", help="use the physical relative-skill language contract in simulation")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     overrides = {}
+    if args.relative_language:
+        overrides["relative_language_planner"] = True
+    if args.manual_control:
+        overrides["manual_control"] = True
     if args.sim or args.real:
         overrides["simulation_mode"] = bool(args.sim)
     for key, value in (("ui_host", args.host), ("ui_port", args.port), ("sim_speedup", args.speedup)):

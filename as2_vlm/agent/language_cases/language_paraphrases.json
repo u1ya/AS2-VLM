@@ -1,0 +1,14 @@
+[
+  {"text":"Оглянись вокруг","status":"ok","steps":[["rotate_relative",360]]},
+  {"text":"Look around clockwise","status":"ok","steps":[["rotate_relative",-360]]},
+  {"text":"Развернись","status":"ok","steps":[["rotate_relative",180]]},
+  {"text":"Turn around to the right","status":"ok","steps":[["rotate_relative",-180]]},
+  {"text":"Отойди назад на полметра","status":"ok","steps":[["walk_relative",-0.5]]},
+  {"text":"Please back up half a metre, then make a quarter turn to your left.","status":"ok","steps":[["walk_relative",-0.5],["rotate_relative",90]]},
+  {"text":"Повернись на сорок пять градусов вправо","status":"ok","steps":[["rotate_relative",-45]]},
+  {"text":"Rotate ninety degrees counterclockwise","status":"ok","steps":[["rotate_relative",90]]},
+  {"text":"Оглянис вокруг","status":"ok","steps":[["rotate_relative",360]]},
+  {"text":"Дойди до кухни","status":"unsupported","steps":[]},
+  {"text":"Go to the door","status":"unsupported","steps":[]},
+  {"text":"Немного повернись","status":"clarify","steps":[]}
+]

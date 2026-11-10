@@ -12,6 +12,7 @@ variable, never the value.
 import json
 import math
 import os
+import re
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
 
@@ -69,6 +70,8 @@ class VLMConfig:
 class RobotConfig:
     transport: str = "cpp_readonly"   # verified Windows/WSL sensors; sdk is experimental actuation
     sensor_binary: str = "build/as2-probe/as2_sensor_stream"
+    sensor_hub_url: str = "http://127.0.0.1:8780"
+    lidar_body_calibration_path: str = ""  # measured transform/dimensions; missing => manual motion refused
     wsl_distro: str = "Ubuntu-22.04"
     network_interface: str = "eth0"
     dds_domain: int = 0
@@ -84,6 +87,8 @@ class RobotConfig:
 
 @dataclass
 class AgentConfig:
+    relative_language_planner: bool = False
+    manual_control: bool = False
     simulation_mode: bool = SIMULATION_MODE
     sim_speedup: float = 1.0
     map_db_path: str = "data/semantic_map.sqlite"
@@ -158,6 +163,17 @@ def _set_dotted(config, dotted, value):
 
 
 def validate(config):
+    if type(config.relative_language_planner) is not bool:
+        raise ValueError("relative_language_planner must be boolean")
+    if type(config.manual_control) is not bool:
+        raise ValueError("manual_control must be boolean")
+    if config.manual_control and (config.ui_host != "127.0.0.1" or config.robot.transport != "cpp_readonly"):
+        raise ValueError("Manual control requires numeric loopback and cpp_readonly sensors")
+    hub = config.robot.sensor_hub_url
+    if not isinstance(hub, str) or (hub and not re.fullmatch(r"http://127\.0\.0\.1:[0-9]{1,5}", hub)):
+        raise ValueError("sensor_hub_url must be empty or a numeric loopback HTTP endpoint")
+    if hub and not 1 <= int(hub.rsplit(":", 1)[1]) <= 65535:
+        raise ValueError("sensor_hub_url port out of range")
     if config.robot.transport not in {"cpp_readonly", "sdk"}:
         raise ValueError("robot.transport must be cpp_readonly or sdk")
     if config.robot.transport == "cpp_readonly" and config.robot.motion_enabled:

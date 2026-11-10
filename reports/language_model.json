@@ -1,0 +1,297 @@
+{
+  "executed": false,
+  "mode": "model_with_guards",
+  "model": "qwen2.5vl:3b",
+  "cases": [
+    {
+      "text": "Оглянись вокруг",
+      "expected": {
+        "text": "Оглянись вокруг",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Повернуться на месте на 360 градусов влево.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Полный обзор вокруг"
+          }
+        ]
+      },
+      "seconds": 0.485
+    },
+    {
+      "text": "Look around clockwise",
+      "expected": {
+        "text": "Look around clockwise",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -360
+          ]
+        ]
+      },
+      "passed": false,
+      "rejected": true,
+      "error": "Language plan rejected: Model changed the explicit turn direction",
+      "seconds": 0.468
+    },
+    {
+      "text": "Развернись",
+      "expected": {
+        "text": "Развернись",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            180
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Повернуться на месте на 180 градусов.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 3.141592653589793,
+            "reasoning": "Turn around means 180 degrees; direction is left"
+          }
+        ]
+      },
+      "seconds": 0.516
+    },
+    {
+      "text": "Turn around to the right",
+      "expected": {
+        "text": "Turn around to the right",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -180
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Повернуться на месте на 180 градусов вправо.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -3.141592653589793,
+            "reasoning": "Turn around means 180 degrees; direction is right"
+          }
+        ]
+      },
+      "seconds": 0.531
+    },
+    {
+      "text": "Отойди назад на полметра",
+      "expected": {
+        "text": "Отойди назад на полметра",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            -0.5
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Пройти назад 0.5 метра.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": -0.5,
+            "angle_rad": null,
+            "reasoning": "Полметра означает 0.5 метра"
+          }
+        ]
+      },
+      "seconds": 0.469
+    },
+    {
+      "text": "Please back up half a metre, then make a quarter turn to your left.",
+      "expected": {
+        "text": "Please back up half a metre, then make a quarter turn to your left.",
+        "status": "ok",
+        "steps": [
+          [
+            "walk_relative",
+            -0.5
+          ],
+          [
+            "rotate_relative",
+            90
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Пройти назад 0.5 м, затем повернуться налево на 90 градусов.",
+        "steps": [
+          {
+            "tool": "walk_relative",
+            "distance_m": -0.5,
+            "angle_rad": null,
+            "reasoning": "Полметра означает 0.5 метра"
+          },
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 1.5707963267948966,
+            "reasoning": "Четверть оборота означает 90 градусов"
+          }
+        ]
+      },
+      "seconds": 0.828
+    },
+    {
+      "text": "Повернись на сорок пять градусов вправо",
+      "expected": {
+        "text": "Повернись на сорок пять градусов вправо",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            -45
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Повернуться вправо на 45 градусов.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": -0.7853981633974483,
+            "reasoning": "Сорок пять градусов вправо"
+          }
+        ]
+      },
+      "seconds": 0.484
+    },
+    {
+      "text": "Rotate ninety degrees counterclockwise",
+      "expected": {
+        "text": "Rotate ninety degrees counterclockwise",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            90
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Повернуться на 90 градусов влево.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 1.5707963267948966,
+            "reasoning": "Counterclockwise direction is left"
+          }
+        ]
+      },
+      "seconds": 0.422
+    },
+    {
+      "text": "Оглянис вокруг",
+      "expected": {
+        "text": "Оглянис вокруг",
+        "status": "ok",
+        "steps": [
+          [
+            "rotate_relative",
+            360
+          ]
+        ]
+      },
+      "passed": true,
+      "actual": {
+        "status": "ok",
+        "summary": "Повернуться на месте на 360 градусов влево.",
+        "steps": [
+          {
+            "tool": "rotate_relative",
+            "distance_m": null,
+            "angle_rad": 6.283185307179586,
+            "reasoning": "Полный обзор вокруг"
+          }
+        ]
+      },
+      "seconds": 0.5
+    },
+    {
+      "text": "Дойди до кухни",
+      "expected": {
+        "text": "Дойди до кухни",
+        "status": "unsupported",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "unsupported",
+        "summary": "Нет карты и навигации до кухни.",
+        "steps": []
+      },
+      "seconds": 0.266
+    },
+    {
+      "text": "Go to the door",
+      "expected": {
+        "text": "Go to the door",
+        "status": "unsupported",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "unsupported",
+        "summary": "Target navigation is unavailable.",
+        "steps": []
+      },
+      "seconds": 0.172
+    },
+    {
+      "text": "Немного повернись",
+      "expected": {
+        "text": "Немного повернись",
+        "status": "clarify",
+        "steps": []
+      },
+      "passed": true,
+      "actual": {
+        "status": "clarify",
+        "summary": "Уточните расстояние в метрах либо угол и одно направление поворота.",
+        "steps": []
+      },
+      "seconds": 0.0
+    }
+  ],
+  "passed": 11,
+  "total": 12
+}

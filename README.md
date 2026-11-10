@@ -1,10 +1,27 @@
 # AS2-VLM
 
+Live person/trash-bin recognition and camera/LiDAR pairing: `./minimap.ps1`,
+http://127.0.0.1:8772/. Physical web motion now requires a calibrated LiDAR obstacle
+gate and is refused with the current uncalibrated setup. See
+[semantic mapping and obstacle interlock](docs/semantic_mapping.md) for current
+hardware results, calibration inputs and remaining verification.
+
+An independent local YOLOX person stream is available on the same mini-map when
+its pinned weights and optional OpenCV environment are installed. It runs beside
+Qwen's bin recognition; see [fast person detection](docs/fast_person_detection.md).
+
+AS2 mini-map preview (2026-11-01): run `./minimap.ps1 -Replay` for private real
+LiDAR recordings plus local camera recognition at http://127.0.0.1:8772/.
+For shared live sensors, start the sensor hub and use `./minimap.ps1`.
+See [Mini-map setup and verification](docs/minimap.md). Object coordinates remain
+image-only until camera/LiDAR calibration is available; live hardware was unavailable
+for this iteration.
+
 A local-first prototype for language-guided navigation on the **Unitree AS2 EDU** quadruped. A compact vision-language model translates human instructions into validated action plans, while navigation and motion execution remain separate responsibilities.
 
 Inspired by [NaVILA](https://github.com/AnjieCheng/NaVILA), this project starts with a narrower scope: one or two actions such as turning, walking a specified distance, approaching a door, or looking around. It is an independent prototype, not a port or reproduction of NaVILA.
 
-**Current status:** local language planning, experimental single-image grounding, and a browser-based 2D simulator work without a robot. Physical AS2 motion control, live sensors, SLAM, and autonomous navigation are not integrated yet.
+**Current status:** local planning, experimental single-image grounding and browser simulation work without a robot. Real AS2 camera, LiDAR and telemetry feed a shared read-only sensor service with private recording and offline auditing. SLAM, calibrated semantic mapping and autonomous physical navigation are not implemented; manual motion probes remain separate.
 
 ![Virtual robot approaching a door](reports/simulator-completed.png)
 
@@ -39,6 +56,16 @@ Optional image --> Qwen2.5-VL --> unverified target-box proposal
 The simulator uses predefined target coordinates and an exactly known robot pose. Image grounding is a separate experimental CLI path and is not connected to navigation.
 
 ## Quick Start
+
+### Paired Language-Control Services
+
+On the configured Windows/WSL development machine, run `./start-services.ps1`.
+Simulation is at http://127.0.0.1:8770/ and real AS2 control at
+http://127.0.0.1:8771/. Both use the same relative-language plan contract; the real
+page previews the model-generated plan before physical execution. It supports
+translations, turns and sequences, not yet real named-place/object navigation.
+See [language control](docs/relative_language_control.md) for build requirements,
+limits, connectivity and verification details.
 
 ### Python Setup
 
@@ -215,7 +242,8 @@ height filtering and private snapshot export. It is a stationary sensor-frame
 view, not global SLAM or known free space. See [Local Geometry](docs/local_geometry.md).
 
 This checkout includes SLAI-VLM/main at `629a9e6`, merged with the verified local
-hardware changes. On this Windows/WSL setup, run `./agent.ps1` for the live
+hardware changes. On this Windows/WSL setup, first keep `./sensor-hub.ps1` running
+in a separate terminal, then run `./agent.ps1` for the live
 read-only sensor dashboard at http://127.0.0.1:8770/, or `./agent.ps1 -Sim` for
 simulated goals. Do not run both on the same port. The sensor profile uses
 videohub JPEGs at 1920x1080 and live LiDAR metadata from the `hesai_lidar` frame.

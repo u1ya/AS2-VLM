@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "lidar_frame": "hesai_lidar",
+  "length_unit": null,
+  "image_size": [1920, 1080],
+  "K": null,
+  "distortion": null,
+  "T_camera_from_lidar": null,
+  "evidence": null
+}

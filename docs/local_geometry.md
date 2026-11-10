@@ -12,6 +12,8 @@ Python needs the `agent` extra, now including NumPy:
 
 ```powershell
 python -m pip install -e '.[agent]'
+.\sensor-hub.ps1  # keep running in one terminal
+# In another terminal:
 .\agent.ps1
 ```
 
@@ -93,6 +95,10 @@ and `/api/geometry/export` with `{}`. There is no client-controlled export path.
 These endpoints do not invoke any robot motion or sensor configuration API.
 
 ## Next Milestone
+
+Read-only recording and the first offline timing audit are now available:
+[SLAM sensor preflight](slam_preflight.md). The measured IMU acceleration is
+dominated by +Y, so this raw-Z slice is not a calibrated ground-height slice.
 
 For a persistent metric map while the robot moves, first identify the actual
 LiDAR and verify its frame axes, scale, IMU timing and transforms. Then integrate

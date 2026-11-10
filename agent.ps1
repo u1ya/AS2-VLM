@@ -1,4 +1,4 @@
-param([switch]$Sim, [int]$Port = 8770)
+param([switch]$Sim, [int]$Port = 8770, [switch]$ManualControl)
 $ErrorActionPreference = 'Stop'
 $python = $env:AS2_VLM_PYTHON
 if (-not $python) {
@@ -11,7 +11,15 @@ try {
     if ($Sim) {
         & $python -m as2_vlm.agent --sim --port $Port
     } else {
-        & $python -m as2_vlm.agent --real --config configs/agent.as2-sensors.json --port $Port
+        try {
+            $health = Invoke-RestMethod http://127.0.0.1:8780/health -TimeoutSec 2
+            if ($health.read_only -ne $true) { throw 'Unexpected service on sensor hub port' }
+        } catch {
+            throw 'Start ./sensor-hub.ps1 in a separate terminal before the live panel.'
+        }
+        $arguments = @('-m', 'as2_vlm.agent', '--real', '--config', 'configs/agent.as2-sensors.json', '--port', "$Port")
+        if ($ManualControl) { $arguments += '--manual-control' }
+        & $python @arguments
     }
     $result = $LASTEXITCODE
 } finally { Pop-Location }

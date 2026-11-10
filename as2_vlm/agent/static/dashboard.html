@@ -106,7 +106,16 @@ main{max-width:1500px;margin:0 auto;padding:14px 16px 32px}
 .muted{color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;z-index:50}
 .toast.on{opacity:.95}
-.sim-only.hidden,.live-only.hidden{display:none}
+.hidden{display:none!important}
+#manualControls h2{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0;font-size:14px;font-weight:650}
+#manualStatus{font-size:12px;font-weight:500;color:var(--muted)}
+#manualForward,#manualStop{min-width:72px;min-height:38px;flex:none}
+#physicalPlanDialog{width:min(560px,calc(100% - 24px));max-height:85vh;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);padding:18px}
+#physicalPlanDialog::backdrop{background:rgba(0,0,0,.6)}
+#physicalPlanDialog h2{font-size:16px;margin:0 0 8px}
+#physicalPlanDialog p,#physicalPlanDialog li{overflow-wrap:anywhere}
+#physicalPlanDialog label{display:block;margin:10px 0}
+#physicalPlanDialog .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
 @media (max-width:980px){.grid{grid-template-columns:1fr}.col-right{order:-1}}
 @media (max-width:560px){main{padding:10px 12px 24px}header{padding:8px 12px}.tiles{grid-template-columns:1fr 1fr}.command{flex-wrap:wrap}.command input{flex-basis:100%;order:-1}}
 </style>
@@ -124,6 +133,17 @@ main{max-width:1500px;margin:0 auto;padding:14px 16px 32px}
   <button class="b-small live-only hidden" id="armBtn">Arm motion</button>
 </header>
 <main>
+  <section id="manualControls" class="hidden" style="padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:12px">
+    <h2>Manual AS2 <span class="meta" id="manualStatus">Ready</span></h2>
+    <div class="row" style="flex-wrap:wrap;gap:12px;margin:8px 0">
+      <label><input type="checkbox" id="manualRemote"> Remote stop ready</label>
+      <label><input type="checkbox" id="manualClear"> Level path clear; cable slack</label>
+      <button id="manualForward" title="Physical forward test: LiDAR clearance required, max 0.15 m/s" disabled>&#8593; 1 m</button>
+      <button id="manualStop" class="b-pause" title="Network StopMove request, not an independent emergency stop">&#9632; Stop</button>
+    </div>
+    <p id="collisionStatus" class="meta" aria-live="polite"></p>
+    <pre id="manualResult" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:130px;overflow:auto;font-size:12px;margin:0" aria-live="polite"></pre>
+  </section>
   <div class="command">
     <button class="mic" id="mic" title="Speak a command" aria-label="Speak a command">🎤</button>
     <input type="text" id="cmd" autocomplete="off" placeholder="Give a goal, e.g. “Check if the back door is locked and make sure the stove is off”">
@@ -160,7 +180,7 @@ main{max-width:1500px;margin:0 auto;padding:14px 16px 32px}
     </div>
     <div class="col col-right">
       <section class="card">
-        <h2>Safety overrides <span class="meta">Space = stop</span></h2>
+        <h2 id="safetyOverridesTitle">Safety overrides <span class="meta">Space = stop</span></h2>
         <div class="safety">
           <button class="b-pause" id="pauseBtn">⏸ PAUSE / STOP MOVE</button>
           <button class="b-abort" id="abortBtn">↩ ABORT &amp; RETURN</button>
@@ -213,10 +233,22 @@ main{max-width:1500px;margin:0 auto;padding:14px 16px 32px}
     </div>
   </div>
 </main>
+<dialog id="physicalPlanDialog" aria-labelledby="physicalPlanTitle">
+  <h2 id="physicalPlanTitle">Review physical plan</h2>
+  <p id="physicalPlanSummary"></p>
+  <ol id="physicalPlanSteps"></ol>
+  <label><input type="checkbox" id="physicalRemote"> Independent remote stop ready</label>
+  <label><input type="checkbox" id="physicalClear"> Full route clear; level floor; cable slack</label>
+  <div class="row">
+    <button id="physicalExecute" disabled>Execute plan</button>
+    <button id="physicalCancel">Cancel</button>
+    <button id="physicalStop" class="b-pause">&#9632; Stop</button>
+  </div>
+</dialog>
 <div class="toast" id="toast" role="status"></div>
 <script>
 const $ = id => document.getElementById(id);
-const S = {snap:null, map:null, mapVersion:-1, selected:null, logAtBottom:true, recognizing:false};
+const S = {snap:null, map:null, mapVersion:-1, selected:null, logAtBottom:true, recognizing:false,plannerInitialized:false};
 const CAT = {door:"#b0673a",window:"#3b9dd8",safety:"#d93025",appliance:"#7b61ff",furniture:"#8d6e63",electronics:"#455a64",
   infrastructure:"#0f9d58",hazard:"#f29900",obstacle:"#e8710a",person:"#c2185b",room:"#9aa4ae",other:"#607d8b"};
 const STATE_DOOR = {open:"#0f9d58",closed:"#d93025",locked:"#a50e0e"};
@@ -233,6 +265,7 @@ const deg = r => Math.round((r||0)*180/Math.PI);
 // ---- commands & voice -------------------------------------------------------------------
 function sendCommand(text, source="text"){
   text=(text||"").trim(); if(!text) return;
+  if(S.snap?.manual_control?.enabled){sendManualText(text);return;}
   post("/api/command",{text,source,planner:$("planner").value}).then(d=>{if(d&&d.accepted){$("cmd").value="";toast("Goal accepted")}})}
 $("send").onclick=()=>sendCommand($("cmd").value);
 $("cmd").addEventListener("keydown",e=>{if(e.key==="Enter")sendCommand($("cmd").value)});
@@ -256,7 +289,79 @@ $("abortBtn").onclick=()=>post("/api/override",{action:"abort_return"});
 $("emergencyBtn").onclick=()=>post("/api/override",{action:"emergency_sit"});
 $("standBtn").onclick=()=>post("/api/override",{action:"stand_up"});
 $("armBtn").onclick=()=>post("/api/override",{action:S.snap&&S.snap.telemetry.armed?"disarm":"arm"});
-document.addEventListener("keydown",e=>{if(e.code==="Space"&&!["INPUT","SELECT","TEXTAREA","BUTTON"].includes(document.activeElement.tagName)){e.preventDefault();$("pauseBtn").click()}});
+document.addEventListener("keydown",e=>{if(e.code==="Space"&&!["INPUT","SELECT","TEXTAREA","BUTTON"].includes(document.activeElement.tagName)){e.preventDefault();if(S.snap?.manual_control?.enabled)$("manualStop").click();else $("pauseBtn").click()}if(e.code==="Escape"&&S.snap?.manual_control?.busy)$("manualStop").click()});
+let manualLease=null,manualSending=false,manualStarting=false,manualStartedAt=0,physicalRequestId=0,physicalDraft=null;
+const originalChips=$("chips").innerHTML,originalPlaceholder=$("cmd").placeholder;
+let manualTextMode=false;
+function updateManual(){const m=S.snap?.manual_control||{};$("manualControls").classList.toggle("hidden",!m.enabled);
+  if(!S.plannerInitialized&&S.snap){$("planner").value=S.snap.planner_backend||"rules";S.plannerInitialized=true;}
+  $("safetyOverridesTitle").parentElement.classList.toggle("hidden",!!m.enabled);
+  const guard=m.collision_guard||{},fresh=guard.configured&&guard.age_s!=null&&guard.age_s<=.3;
+  $("collisionStatus").textContent=!guard.configured?"Движение заблокировано: нужна измеренная привязка LiDAR к корпусу.":!fresh?"Движение заблокировано: нет свежей проверки LiDAR.":"LiDAR: вперёд "+(guard.forward?"доступно":"заблокировано")+", назад "+(guard.reverse?"доступно":"заблокировано")+", поворот "+(guard.rotate?"доступно":"заблокировано")+". Экспериментальная проверка.";
+  $("manualForward").disabled=!m.enabled||m.busy||m.planning||manualStarting||!fresh||!guard.forward||!$("manualRemote").checked||!$("manualClear").checked||!S.snap?.telemetry?.connected;
+  $("manualStatus").textContent=m.planning?"Language model planning…":m.busy?(m.stopping?"Stop requested":"Physical plan · step "+(m.step||1)):(m.exit_code==null?(m.model||"Model")+" · ready":"Finished · exit "+m.exit_code);
+  $("manualResult").textContent=m.result||"";
+  $("send").disabled=!!S.snap?.read_only&&!m.enabled;
+  $("planner").classList.toggle("hidden",!!m.enabled);
+  $("lang").classList.toggle("hidden",!!m.enabled);
+  $("cmd").placeholder=m.enabled?(m.language_planning?"Повернись направо и отступи на полметра…":"Пройди 1 метр вперёд / стоп"):originalPlaceholder;
+  const textMode=m.enabled?(m.language_planning?"language":"legacy"):false;
+  if(manualTextMode!==textMode){manualTextMode=textMode;$("chips").innerHTML=textMode==="language"?'<button>Повернись направо и пройди вперёд полметра</button><button>Отступи на полметра</button><button>Сделай полный оборот налево</button><button>Стоп</button>':textMode==="legacy"?'<button>Пройди 1 метр вперёд</button><button>Стоп</button>':originalChips;}
+  if(!m.busy&&!manualStarting&&performance.now()-manualStartedAt>2000)manualLease=null;
+}
+$("manualRemote").onchange=updateManual;$("manualClear").onchange=updateManual;
+async function startManual(text=null){
+  if(manualStarting){toast("Command submission already pending");return;}
+  if(!$("manualRemote").checked||!$("manualClear").checked){toast("Confirm remote stop ready and clear level path with cable slack");return;}
+  if(!confirm("Physical AS2 motion: forward up to 1 m by odometry. No obstacle detection. Keep the independent remote stop ready. Start?"))return;
+  manualStarting=true;updateManual();
+  const body={remote_ready:$("manualRemote").checked,path_clear:$("manualClear").checked};if(text!==null)body.text=text;
+  const data=await post(text===null?"/api/manual/start":"/api/manual/text",body);
+  if(data?.accepted){manualLease=data.lease;manualStartedAt=performance.now();$("manualRemote").checked=false;$("manualClear").checked=false;}
+  manualStarting=false;
+  return data;
+}
+$("manualForward").onclick=()=>startManual();
+async function sendManualText(text){
+  if(!S.snap?.manual_control?.language_planning){
+    const parsed=await post("/api/manual/parse",{text});if(!parsed)return;
+    if(parsed.action==="stop"){await requestManualStop();$("cmd").value="";return;}
+    const response=await startManual(text);if(response?.accepted)$("cmd").value="";return;
+  }
+  const requestId=++physicalRequestId;
+  const response=await post("/api/manual/plan",{text});if(!response||requestId!==physicalRequestId||!S.snap?.manual_control?.enabled)return;
+  if(response.action==="stop"){await requestManualStop();$("cmd").value="";return;}
+  const plan=response.plan;if(!plan)return;
+  if(plan.status!=="ok"){toast(plan.summary);return;}
+  if(plan.steps.every(step=>step.tool==="stop")){await requestManualStop();$("cmd").value="";return;}
+  physicalDraft={id:response.plan_id,at:performance.now()};
+  $("physicalPlanSummary").textContent=plan.summary;
+  $("physicalPlanSteps").innerHTML=plan.steps.map(step=>`<li><b>${esc(step.tool)}</b> ${esc(argsOf(step))}<br>${esc(step.reasoning)}</li>`).join("");
+  $("physicalRemote").checked=false;$("physicalClear").checked=false;updatePhysicalConfirmation();
+  if(!$("physicalPlanDialog").open)$("physicalPlanDialog").showModal();
+}
+function updatePhysicalConfirmation(){const guard=S.snap?.manual_control?.collision_guard;$("physicalExecute").disabled=!physicalDraft||performance.now()-physicalDraft.at>60000||manualStarting||!S.snap?.telemetry?.connected||!guard?.configured||guard.age_s==null||guard.age_s>.3||!$("physicalRemote").checked||!$("physicalClear").checked;}
+$("physicalRemote").onchange=updatePhysicalConfirmation;$("physicalClear").onchange=updatePhysicalConfirmation;
+$("physicalCancel").onclick=()=>{physicalRequestId++;$("physicalPlanDialog").close();physicalDraft=null;};
+$("physicalPlanDialog").addEventListener("cancel",event=>{if(manualStarting){event.preventDefault();requestManualStop();}else physicalDraft=null;});
+$("physicalExecute").onclick=async()=>{
+  if(!physicalDraft||manualStarting)return;manualStarting=true;updatePhysicalConfirmation();
+  const draft=physicalDraft;
+  const response=await post("/api/manual/execute-plan",{plan_id:draft.id,remote_ready:$("physicalRemote").checked,path_clear:$("physicalClear").checked});
+  if(response?.accepted){manualLease=response.lease;manualStartedAt=performance.now();$("cmd").value="";$("physicalPlanDialog").close();physicalDraft=null;}
+  manualStarting=false;updatePhysicalConfirmation();
+};
+async function requestManualStop(){physicalRequestId++;physicalDraft=null;manualLease=null;if($("physicalPlanDialog").open)$("physicalPlanDialog").close();await post("/api/manual/stop",{});}
+$("manualStop").onclick=requestManualStop;$("physicalStop").onclick=requestManualStop;
+setInterval(()=>{if($("physicalPlanDialog").open)updatePhysicalConfirmation();},1000);
+setInterval(async()=>{if(!manualLease||manualSending)return;manualSending=true;
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),700);
+  try{const response=await fetch("/api/manual/heartbeat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({lease:manualLease}),signal:controller.signal});if(!response.ok)manualLease=null;}
+  catch{manualLease=null;toast("Manual connection lost; use the remote stop if needed");}
+  finally{clearTimeout(timeout);manualSending=false;}
+},200);
+function leaveManual(){if(manualLease){manualLease=null;navigator.sendBeacon("/api/manual/stop",new Blob(["{}"],{type:"application/json"}));}}
+window.addEventListener("pagehide",leaveManual);document.addEventListener("visibilitychange",()=>{if(document.hidden)leaveManual()});
 $("modeSim").onclick=()=>switchMode(true);$("modeLive").onclick=()=>switchMode(false);
 async function switchMode(sim){const d=await post("/api/mode",{simulation:sim});if(d&&d.ok){S.mapVersion=-1;toast(sim?"Simulation mode":"Live AS2 mode")}}
 $("injectBtn").onclick=()=>{const [kind,a,b]=$("anomaly").value.split(":");let params={};
@@ -373,8 +478,11 @@ function render(){
   document.querySelectorAll(".sim-only").forEach(e=>e.classList.toggle("hidden",!sim));
   document.querySelectorAll(".live-only").forEach(e=>e.classList.toggle("hidden",sim));
   const sp=$("statePill");sp.textContent=s.paused?"PAUSED":s.state.replaceAll("_"," ");sp.className="pill state-"+(s.paused?"PAUSED":s.state);
+  if(s.manual_control?.busy){sp.textContent=s.manual_control.stopping?"MANUAL STOPPING":"MANUAL ACTIVE";sp.className="pill state-EXECUTING";}
   $("armPill").textContent=!t.motion_enabled?"Motion disabled (config)":t.armed?"Motion: ARMED":"Motion: disarmed";
   $("armBtn").textContent=t.armed?"Disarm":"Arm motion";$("armBtn").disabled=!t.motion_enabled;
+  if(s.manual_control?.enabled){$("armPill").textContent="Language / manual control";$("armBtn").classList.add("hidden");}else{$("armBtn").classList.remove("hidden");}
+  updateManual();
   $("pauseBtn").textContent=s.paused?"▶ RESUME":"⏸ PAUSE / STOP MOVE";
   $("safetyNote").textContent=t.emergency_latched?"Emergency latched":(t.notes||[]).join(" · ");
   $("activity").textContent=s.activity||"Idle";
@@ -383,7 +491,10 @@ function render(){
   $("confText").textContent=conf==null?"—":Math.round(conf*100)+"%";$("confSource").textContent=s.confidence_source||"";
   $("waitBanner").classList.toggle("on",!!s.waiting_for);$("waitBanner").textContent=s.waiting_for?"🙋 Waiting for a person to "+s.waiting_for:"";
   $("backendMeta").textContent=`perception: ${s.perception_backend} · planner: ${s.planner_backend}`;
-  const plan=s.plan;$("planMeta").textContent=plan?`${plan.planner} · ${plan.steps.length} steps`:"no active plan";
+  const languagePlan=s.manual_control?.language_plan;
+  const plan=languagePlan?{...languagePlan,planner:s.manual_control.model,steps:languagePlan.steps.map(step=>({...step,status:"planned"}))}:s.plan;
+  $("planMeta").textContent=plan?`${plan.planner} · ${plan.steps.length} steps`:"no active plan";
+  if(languagePlan){$("why").textContent=languagePlan.summary;$("activity").textContent=s.manual_control.planning?"Language planning":s.manual_control.busy?"Executing physical plan":"Language plan · "+languagePlan.status;}
   $("steps").innerHTML=plan?plan.steps.map((st,i)=>`<li class="${st.status}"><span class="ico">${st.status==="done"?"✓":st.status==="failed"?"!":st.status==="skipped"||st.status==="cancelled"?"–":i+1}</span>
     <div><div class="tool">${esc(st.tool)}</div><div class="args">${esc(argsOf(st))}</div><div class="reason">↳ ${esc(st.reasoning)}</div></div></li>`).join(""):"";
   $("findings").innerHTML=(s.findings||[]).length?s.findings.map(f=>`<div class="finding"><span class="badge ${f.answer}">${f.answer.toUpperCase()}</span>

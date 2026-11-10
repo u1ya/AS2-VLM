@@ -1,5 +1,65 @@
 # Resume the AS2 VLM Project
 
+2026-11-01: new read-only mini-map on 8772, `./minimap.ps1 -Replay` for the local
+AS2 recording and unpaired camera still, or `./minimap.ps1` with the shared live hub.
+All 28 recorded clouds decoded, 1843 return cells; real local Qwen camera inference
+works, with approximate unverified boxes bound to the analyzed frame. No camera
+coordinates are projected into LiDAR without calibration. Robot Ethernet was
+disconnected; owner requested offline work. See [minimap.md](minimap.md) for
+observed model errors, startup, tests and remaining hardware verification.
+
+2026-10-31: `./start-services.ps1` now starts separate simulation (8770) and real
+control (8771), model (11434) and shared sensors (8780). Relative language plans
+use the same Qwen-backed contract in both modes. Real reverse/turn/distance steps
+use as2_relative_move with bounded execution, plan preview and explicit execution.
+Robot telemetry was unavailable during deployment; no physical actions were sent.
+See [relative_language_control.md](relative_language_control.md) for current setup.
+
+Live manual text on 8771: Send/Enter now supports forward one metre (RU/EN) and
+stop through the existing guarded manual channel. Arbitrary planner goals remain
+blocked. Movement acknowledgements, fixed limits and heartbeats are retained;
+text stop does not require those acknowledgements. 159 Python tests passed.
+
+Panel 8771 now has opt-in bounded manual forward/stop controls, deployed with
+`./agent.ps1 -Port 8771 -ManualControl`. Planner, calibration and autonomous
+navigation remain blocked. Sensor read_only/motion_enabled flags are deliberately
+unchanged; the physical manual channel is separate, guarded and OS-exclusive.
+See [manual_web_control.md](manual_web_control.md) before using the buttons.
+
+Calibration evidence stage: official AS2 URDF/MJCF inspected at Unitree ROS commit
+15ebe53f4cd77e7d745ae83b9d7ff90e685e8998; no usable LiDAR-IMU transform supplied
+there. Known robot SSH port timed out; owner has no onboard access/factory files.
+Added a null-valued calibration profile template and offline evidence checker,
+with no transforms applied or calibration claimed. See [calibration.md](calibration.md).
+
+Current acquisition architecture: one sensor hub on 8780 owns one DDS bridge;
+both live panels (8770/8771) now use shared HTTP clients, with no fallback readers.
+Start `./sensor-hub.ps1`, then `./agent.ps1` in another terminal. Record with
+`./record-shared-sensors.ps1 -Name NEW_NAME -Seconds 8`. The shared capture with
+both panels delivered source-time 10 Hz clouds (max 100.25 ms) and 200 Hz IMU
+(max 5.145 ms), with 87 clouds replay-decoded and no reported application drops.
+Read [shared_sensors.md](shared_sensors.md) before using the older isolation steps
+below. Motion remains disabled; SLAM and calibration are not yet implemented.
+
+Latest sensor milestone: read-only cloud/IMU/odometry recording and offline timing
+audit implemented. The stationary 2026-10-25 capture replay-decodes all 73 clouds.
+128 ring IDs were observed, but the exact sensor model/extrinsics remain unknown;
+IMU gaps reach 55 ms and acceleration is dominated by +Y. SLAM remains disabled.
+See [slam_preflight.md](slam_preflight.md) for findings, repeat commands and gates.
+
+Follow-up queue investigation: the recorder now defaults to IMU queue depth 256
+(cloud 16, odometry 64). A repeat stationary capture delivered approximately
+200 Hz IMU with maximum interval 5.15 ms, but cloud intervals still reached
+400 ms. Initial 55 ms IMU gaps above describe the original depth-one recording,
+not the latest capture. Calibration and SLAM readiness remain unverified.
+
+Load isolation: both 8770 and 8771 were live read-only subscribers. With both
+temporarily off, LiDAR delivered 10 Hz (max interval 100.228 ms); after restoring
+both, 8.75 Hz (max 400.204 ms). Both panels were restored successfully. Repeat
+using `./measure-sensor-load.ps1 -RecordingName NEW_NAME`; see the preflight doc.
+Concurrent acquisition load is implicated, but the shared-ingestion fix and
+precise bottleneck isolation are not yet implemented.
+
 Latest geometric milestone: the live panel at 8770 now renders real LiDAR XYZ as
 a stationary sensor-frame XY return-density view, with a height filter and private
 snapshot export. Read [local_geometry.md](local_geometry.md) before interpreting it
@@ -30,8 +90,9 @@ required execution outside the restricted sandbox for temporary files and loopba
 - Separate, manually confirmed C++ stop, short forward pulse and odometry-distance tests.
 - The browser and language planner do NOT control physical motion.
 
-No camera/LiDAR integration, SLAM, obstacle-aware physical navigation or production
-safety controller is implemented. Firmware version and onboard login remain unknown.
+Read-only camera/LiDAR integration is implemented. SLAM, obstacle-aware physical
+navigation and a production safety controller are not implemented. Onboard login
+and the exact LiDAR model remain unknown.
 
 ## Saved Setup
 
@@ -43,7 +104,7 @@ safety controller is implemented. Firmware version and onboard login remain unkn
 | Ethernet gateway / DNS | None on this isolated link |
 | Windows adapter | Ethernet, Realtek Gaming GbE Family Controller |
 | Linux environment | WSL2 Ubuntu-22.04, mirrored networking |
-| Last WSL interface | eth1; verify after each restart |
+| Last WSL interface | eth0; verify after each restart |
 | SDK2 revision | d1abf001220d3e5f59e00a0c4aaa595e00089a4a |
 | Local Windows workspace | C:\Users\Ulugb\Desktop\SLAI VLM |
 | Local WSL workspace | /mnt/c/Users/Ulugb/Desktop/SLAI VLM |

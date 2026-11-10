@@ -8,12 +8,16 @@
 
 The current checkout merges SLAI-VLM/main at 629a9e6 with the local AS2 hardware
 work. `robot.transport=cpp_readonly` is the real-mode default and has no movement
-API. It starts `as2_sensor_stream` through WSL on Windows (directly on Linux).
-The stream subscribes to sportmodestate and LiDAR cloud/state, and requests JPEGs
-from videohub. Closing the adapter sends only a process-quit message over stdin;
-it does not send StopMove, StandDown or Damp to the robot.
+API. Live panels now attach to one loopback sensor hub; only the hub starts
+`as2_sensor_stream` through WSL on Windows (directly on Linux). It subscribes to
+sportmodestate, LiDAR cloud/state and IMU, and requests JPEGs from videohub.
+Closing a panel does not close acquisition. Stopping the hub sends only a local
+process-quit message, never StopMove, StandDown or Damp. See
+[Shared sensors](shared_sensors.md) for recording and restart instructions.
 
 PowerShell from the project root:
+
+First run `./sensor-hub.ps1` in a separate terminal for live sensors.
 
 ```powershell
 .\agent.ps1          # real sensors, commands disabled, http://127.0.0.1:8770

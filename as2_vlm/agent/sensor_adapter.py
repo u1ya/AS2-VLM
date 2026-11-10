@@ -1,6 +1,7 @@
 """Read-only C++/WSL sensor transport for the verified AS2 configuration."""
 import io
 import json
+import logging
 import math
 import os
 from pathlib import Path
@@ -14,6 +15,7 @@ import time
 from .models import Pose, Telemetry
 from .robot_adapter import AdapterError, BaseRobotAdapter, CameraFrame
 from .lidar_geometry import LocalLidarGeometry, decode_xyz
+from .obstacle_guard import ObstacleGuard, movement_permission
 
 
 class ReadOnlySensorAdapter(BaseRobotAdapter):
@@ -34,8 +36,12 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
         self._frame = None
         self._frame_received = -math.inf
         self._frame_sequence = 0
+        self._cloud_raw = None
+        self._cloud_sequence = 0
         self._error = None
         self.local_geometry = LocalLidarGeometry()
+        path = config.robot.lidar_body_calibration_path
+        self.obstacle_guard = ObstacleGuard.load(config.resolve_path(path) if path else None)
 
     @staticmethod
     def _linux_path(path):
@@ -68,8 +74,11 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
                 raise AdapterError("WSL is unavailable")
             args = [wsl, "-d", rc.wsl_distro, "--", *args]
         try:
-            self._process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                             stderr=subprocess.DEVNULL, shell=False)
+            log = Path(self.config.resolve_path("logs/sensor-bridge.stderr.log"))
+            log.parent.mkdir(parents=True, exist_ok=True)
+            with log.open("ab") as errors:
+                self._process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                                 stderr=errors, shell=False)
             self._thread = threading.Thread(target=self._read_loop, name="as2-sensors", daemon=True)
             self._thread.start()
             if not self._ready.wait(12) or self._error:
@@ -79,7 +88,7 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
             raise
 
     def _accept(self, snapshot):
-        if not isinstance(snapshot, dict) or set(snapshot) != {"state", "lidar", "camera"}:
+        if not isinstance(snapshot, dict) or not {"state", "lidar", "camera"} <= set(snapshot) or set(snapshot) - {"state", "lidar", "camera", "recording"}:
             raise ValueError("Invalid sensor envelope")
         if any(not isinstance(value, dict) for value in snapshot.values()):
             raise ValueError("Invalid sensor objects")
@@ -112,6 +121,10 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
                             raw_cloud = source.read(16 * 1024 * 1024 + 9)
                         xyz = decode_xyz(raw_cloud, lidar)
                         if xyz is not None:
+                            with self._lock:
+                                self._cloud_raw = raw_cloud
+                                self._cloud_sequence = lidar["cloud_sequence"]
+                            self.obstacle_guard.ingest(xyz, lidar, snapshot["state"])
                             self.local_geometry.ingest(xyz, lidar, snapshot["state"])
                     except (OSError, ValueError) as exc:
                         self.local_geometry.invalidate(str(exc))
@@ -141,7 +154,11 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
         except Exception as exc:
             with self._lock:
                 self._error = str(exc)
+            logging.exception("AS2 sensor reader failed")
         finally:
+            with self._lock:
+                if self._error is None:
+                    self._error = "Sensor acquisition stream ended; inspect logs/sensor-bridge.stderr.log"
             self._ready.set()
 
     def sensor_status(self):
@@ -155,7 +172,14 @@ class ReadOnlySensorAdapter(BaseRobotAdapter):
             result["scan_for_navigation"] = False
             result["error_message"] = self._error
             result["geometry"] = self.local_geometry.status()
+            result["collision_guard"] = self.collision_status()
             return result
+
+    def collision_status(self):
+        return self.obstacle_guard.status()
+
+    def movement_permission(self, mode, amount):
+        return movement_permission(self.collision_status(), mode, amount)
 
     def get_telemetry(self):
         with self._lock:
